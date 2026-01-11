@@ -1,0 +1,562 @@
+/* ============================================
+   TYPING INDICATOR+ - Premium Styles
+   
+   Original extension by Cohee1207
+   Enhanced version by Loggo
+   ============================================ */
+
+/* === Base Indicator === */
+.typing_indicator_plus {
+    position: sticky;
+    bottom: 10px;
+    margin: 10px;
+    z-index: 100;
+    order: 9999;
+
+    /* Animation states */
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+
+    /* Visual */
+    color: var(--SmartThemeBodyColor, #e0e0e0);
+    text-shadow: 0px 0px calc(var(--shadowWidth, 2) * 1px) var(--SmartThemeShadowColor, rgba(0, 0, 0, 0.5));
+}
+
+.typing_indicator_plus.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.typing_indicator_plus.hiding {
+    opacity: 0;
+    transform: translateY(4px);
+}
+
+.typing_indicator_plus.paused .typing-dots-container,
+.typing_indicator_plus.paused .discord-dots {
+    opacity: 0.3;
+}
+
+/* === Position Variants === */
+.typing-position-bottom {
+    position: sticky;
+    bottom: 10px;
+}
+
+.typing-position-inline {
+    position: relative;
+    bottom: auto;
+}
+
+.typing-position-floating {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    margin: 0;
+    z-index: 9999;
+}
+
+.typing-position-floating.visible {
+    transform: translateX(-50%) translateY(0);
+}
+
+/* === Content Wrapper === */
+.typing-content-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--SmartThemeBlurTintColor, rgba(30, 30, 35, 0.85));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+/* === Avatar === */
+.typing-avatar {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.typing-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.typing-avatar.placeholder {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    color: white;
+}
+
+.typing-avatar.pulsing {
+    animation: avatarPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes avatarPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 0 6px rgba(255, 255, 255, 0), 0 2px 8px rgba(0, 0, 0, 0.3);
+        transform: scale(1.03);
+    }
+}
+
+/* === Dots === */
+.typing-dots-container {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    transition: opacity 0.3s ease;
+}
+
+.typing-dots-container svg {
+    display: block;
+}
+
+/* === Text === */
+.typing-text {
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.typing-text-small {
+    font-size: 11px;
+    opacity: 0.6;
+    font-weight: 500;
+}
+
+.typing-text-fade {
+    font-size: 12px;
+    opacity: 0.75;
+}
+
+.typing-text-minimal {
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+/* === STYLE: Speech Bubble === */
+.typing-style-speech_bubble .typing-bubble-wrapper {
+    align-items: flex-end;
+}
+
+.typing-style-speech_bubble .typing-bubble {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 16px 16px 16px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+/* === STYLE: Bouncing Dots === */
+.typing-style-bouncing_dots .typing-bouncing-wrapper {
+    padding: 10px 18px;
+    border-radius: 20px;
+}
+
+.typing-style-bouncing_dots .typing-bouncing-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* === STYLE: Pulsing Avatar === */
+.typing-style-pulsing_avatar .typing-pulsing-wrapper {
+    padding: 8px 14px 8px 8px;
+    border-radius: 24px;
+}
+
+/* === STYLE: Minimal === */
+.typing-style-minimal .typing-minimal-wrapper {
+    background: transparent;
+    backdrop-filter: none;
+    border: none;
+    box-shadow: none;
+    padding: 8px 12px;
+    opacity: 0.7;
+}
+
+/* === STYLE: Discord === */
+.typing-style-discord .typing-discord-wrapper {
+    background: rgba(32, 34, 37, 0.95);
+    border-radius: 6px;
+    padding: 8px 12px;
+    border: none;
+}
+
+.typing-style-discord .typing-discord-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.typing-style-discord .discord-dots {
+    display: flex;
+    gap: 3px;
+}
+
+.typing-style-discord .discord-dots span {
+    width: 7px;
+    height: 7px;
+    background: #72767d;
+    border-radius: 50%;
+    animation: discordDot 1.4s ease-in-out infinite;
+}
+
+.typing-style-discord .discord-dots span:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.typing-style-discord .discord-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-style-discord .discord-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes discordDot {
+
+    0%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.4;
+    }
+
+    50% {
+        transform: translateY(-3px);
+        opacity: 1;
+    }
+}
+
+.typing-style-discord .typing-text-discord {
+    font-size: 12px;
+    color: #b9bbbe;
+}
+
+.typing-style-discord .typing-text-discord strong {
+    color: #fff;
+}
+
+.typing-style-discord .typing-avatar {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+}
+
+/* === Animation Theme: Playful === */
+.typing-theme-playful .typing-content-wrapper {
+    animation: playfulFloat 2.5s ease-in-out infinite;
+}
+
+@keyframes playfulFloat {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-2px);
+    }
+}
+
+/* === Settings Panel === */
+.typing-setting-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.typing-setting-row label {
+    font-size: 12px;
+    opacity: 0.8;
+    font-weight: 500;
+}
+
+.typing-setting-row input[type="range"] {
+    width: 100%;
+    cursor: pointer;
+}
+
+.typing-setting-row small {
+    font-size: 11px;
+}
+
+/* === User Typing Indicator === */
+.typing-user-indicator {
+    opacity: 0.6;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE STYLES
+   Only applied when .typing-indicator-mobile-mode is on body
+   ============================================ */
+
+/* === Tablet (max-width: 768px) === */
+@media screen and (max-width: 768px) {
+    .typing-indicator-mobile-mode .typing_indicator_plus {
+        margin: 8px;
+        bottom: 8px;
+    }
+
+    .typing-indicator-mobile-mode .typing-content-wrapper {
+        padding: 8px 12px;
+        gap: 8px;
+        border-radius: 12px;
+        max-width: calc(100vw - 24px);
+    }
+
+    .typing-indicator-mobile-mode .typing-avatar {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+    }
+
+    .typing-indicator-mobile-mode .typing-avatar.placeholder {
+        font-size: 12px;
+    }
+
+    .typing-indicator-mobile-mode .typing-text {
+        font-size: 12px;
+    }
+
+    .typing-indicator-mobile-mode .typing-text-small {
+        font-size: 10px;
+    }
+
+    .typing-indicator-mobile-mode .typing-dots-container svg {
+        width: 24px;
+        height: 14px;
+    }
+
+    .typing-indicator-mobile-mode .typing-position-floating {
+        bottom: 60px;
+        left: 50%;
+        right: auto;
+        max-width: calc(100vw - 20px);
+    }
+
+    .typing-indicator-mobile-mode .typing-style-speech_bubble .typing-bubble {
+        padding: 8px 12px;
+        border-radius: 14px 14px 14px 4px;
+    }
+
+    .typing-indicator-mobile-mode .typing-style-discord .typing-avatar {
+        width: 22px;
+        height: 22px;
+        min-width: 22px;
+    }
+
+    .typing-indicator-mobile-mode .typing-style-discord .typing-text-discord {
+        font-size: 11px;
+    }
+
+    .typing-indicator-mobile-mode .typing-style-discord .discord-dots span {
+        width: 6px;
+        height: 6px;
+    }
+
+    .typing-indicator-mobile-mode .typing-theme-playful .typing-content-wrapper {
+        animation: none;
+    }
+}
+
+/* === Mobile (max-width: 480px) === */
+@media screen and (max-width: 480px) {
+    .typing-indicator-mobile-mode .typing_indicator_plus {
+        margin: 6px;
+        bottom: 6px;
+    }
+
+    .typing-indicator-mobile-mode .typing-content-wrapper {
+        padding: 7px 10px;
+        gap: 6px;
+        border-radius: 10px;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .typing-indicator-mobile-mode .typing-avatar {
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+        border-width: 1.5px;
+    }
+
+    .typing-indicator-mobile-mode .typing-avatar.placeholder {
+        font-size: 11px;
+    }
+
+    .typing-indicator-mobile-mode .typing-text {
+        font-size: 11px;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .typing-indicator-mobile-mode .typing-text-small,
+    .typing-indicator-mobile-mode .typing-text-fade,
+    .typing-indicator-mobile-mode .typing-text-minimal {
+        font-size: 10px;
+    }
+
+    .typing-indicator-mobile-mode .typing-dots-container svg {
+        width: 20px;
+        height: 12px;
+    }
+
+    .typing-indicator-mobile-mode .typing-position-floating {
+        bottom: 50px;
+    }
+
+    .typing-indicator-mobile-mode .typing-style-bouncing_dots .typing-bouncing-wrapper {
+        padding: 7px 12px;
+        border-radius: 16px;
+    }
+
+    .typing-indicator-mobile-mode .typing-style-pulsing_avatar .typing-pulsing-wrapper {
+        padding: 6px 10px 6px 6px;
+        border-radius: 20px;
+    }
+
+    .typing-indicator-mobile-mode .typing-style-minimal .typing-minimal-wrapper {
+        padding: 6px 8px;
+    }
+
+    .typing-indicator-mobile-mode .typing-avatar.pulsing {
+        animation: none;
+    }
+}
+
+/* === Small Mobile (max-width: 360px) === */
+@media screen and (max-width: 360px) {
+    .typing-indicator-mobile-mode .typing_indicator_plus {
+        margin: 4px;
+        bottom: 4px;
+    }
+
+    .typing-indicator-mobile-mode .typing-content-wrapper {
+        padding: 6px 8px;
+        gap: 5px;
+        border-radius: 8px;
+    }
+
+    .typing-indicator-mobile-mode .typing-avatar {
+        width: 20px;
+        height: 20px;
+        min-width: 20px;
+        border-width: 1px;
+    }
+
+    .typing-indicator-mobile-mode .typing-text {
+        font-size: 10px;
+        max-width: 100px;
+    }
+
+    .typing-indicator-mobile-mode .typing-dots-container svg {
+        width: 18px;
+        height: 10px;
+    }
+
+    .typing-indicator-mobile-mode .typing-style-bouncing_dots .typing-avatar,
+    .typing-indicator-mobile-mode .typing-style-wave_dots .typing-avatar {
+        display: none;
+    }
+}
+
+/* === Landscape Mobile === */
+@media screen and (max-height: 500px) and (orientation: landscape) {
+    .typing-indicator-mobile-mode .typing_indicator_plus {
+        margin: 4px 8px;
+        bottom: 4px;
+    }
+
+    .typing-indicator-mobile-mode .typing-content-wrapper {
+        padding: 5px 10px;
+    }
+
+    .typing-indicator-mobile-mode .typing-avatar {
+        width: 22px;
+        height: 22px;
+        min-width: 22px;
+    }
+
+    .typing-indicator-mobile-mode .typing-text {
+        font-size: 11px;
+    }
+
+    .typing-indicator-mobile-mode .typing-position-floating {
+        bottom: 40px;
+    }
+}
+
+/* === Reduce Motion (Accessibility) - Always applies === */
+@media (prefers-reduced-motion: reduce) {
+    .typing_indicator_plus {
+        transition: opacity 0.1s ease;
+        transform: none !important;
+    }
+
+    .typing_indicator_plus.visible {
+        transform: none !important;
+    }
+
+    .typing-avatar.pulsing {
+        animation: none;
+    }
+
+    .typing-theme-playful .typing-content-wrapper {
+        animation: none;
+    }
+
+    .typing-style-discord .discord-dots span {
+        animation: none;
+        opacity: 0.7;
+    }
+
+    .typing-dots-container svg circle {
+        animation: none !important;
+        opacity: 0.7;
+    }
+}
+
+/* === Touch Device Optimizations - Always applies === */
+@media (hover: none) and (pointer: coarse) {
+    .typing-content-wrapper {
+        min-height: 36px;
+    }
+
+    .typing-avatar:hover {
+        transform: none;
+    }
+}

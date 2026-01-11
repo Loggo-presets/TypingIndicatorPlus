@@ -1,0 +1,13 @@
+{
+    "display_name": "Typing Indicator+",
+    "loading_order": 777,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Cohee1207, Enhanced by Loggo",
+    "version": "2.0.0",
+    "homePage": "https://github.com/SillyTavern/Extension-TypingIndicator",
+    "auto_update": false,
+    "i18n": {}
+}
