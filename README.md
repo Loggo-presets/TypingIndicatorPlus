@@ -17,7 +17,7 @@ An enhanced typing indicator extension for SillyTavern with multiple visual styl
 ## Installation
 
 1. Go to SillyTavern Extensions panel
-2. Install from URL: `https://github.com/Loggo-presets/TypingIndicator-Plus`
+2. Install from URL: `https://github.com/Loggo-presets/TypingIndicatorPlus`
 3. Or copy this folder to `SillyTavern/public/scripts/extensions/third-party/`
 
 ## Settings
@@ -64,3 +64,4 @@ This extension is a fork of the original **Typing Indicator** extension created 
 
 
 All credit for the original concept and base implementation goes to Cohee1207.
+
