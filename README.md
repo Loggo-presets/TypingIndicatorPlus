@@ -5,14 +5,30 @@ An enhanced typing indicator extension for SillyTavern with multiple visual styl
 ## Features
 
 - ✨ **7 Visual Styles**: Classic, Speech Bubble, Bouncing Dots, Pulsing Avatar, Wave Dots, Minimal, Discord
+
+<img width="177" height="41" alt="image" src="https://github.com/user-attachments/assets/e6b928e8-b866-4356-986f-53337f305b13" />
+<img width="162" height="49" alt="image" src="https://github.com/user-attachments/assets/060d32c7-b222-4397-ab75-a933b500e3b8" />
+<img width="152" height="63" alt="image" src="https://github.com/user-attachments/assets/322016a3-4aea-4eda-b628-4848235f2209" />  
+
 - 🎨 **4 Animation Themes**: Smooth, Playful, Minimal, Wave
-- 🖼️ **Character Avatar Support**: Shows the character's avatar in the indicator
-- 📍 **3 Position Options**: Bottom (sticky), Inline (after messages), Floating (overlay)
+- 🖼️ **Character / Persona Avatar Support**: Shows the character or persona's avatar in the indicator
+<img width="208" height="51" alt="image" src="https://github.com/user-attachments/assets/f78c1057-4e99-478a-97b3-ffb4d45a8067" />
+
+
+- 📍 **3 Position Options**: Bottom (sticky), Inline (after messages):
+<img width="1217" height="104" alt="image" src="https://github.com/user-attachments/assets/80d7d0c1-cd11-4f4a-b609-66d3c05423c5" />
+
+
+- Floating (overlay):
+<img width="1248" height="124" alt="image" src="https://github.com/user-attachments/assets/2c47e19b-0f2c-4541-98fe-0388de6c7bbf" />
+
 - 🔊 **Sound Effects**: Optional typing sounds with volume control
 - ⏸️ **Realistic Pauses**: Simulate natural typing with random pauses
 - 🎯 **Custom Text**: Personalize the typing message with `{{char}}` placeholder
 - 🌊 **Streaming Support**: Works with streaming enabled!
 - 💎 **Glassmorphism Design**: Premium blur and gradient effects
+<img width="604" height="683" alt="image" src="https://github.com/user-attachments/assets/dc743ce4-369a-4fea-a4eb-52fd6e450c77" />
+
 
 ## Installation
 
@@ -64,4 +80,5 @@ This extension is a fork of the original **Typing Indicator** extension created 
 
 
 All credit for the original concept and base implementation goes to Cohee1207.
+
 
