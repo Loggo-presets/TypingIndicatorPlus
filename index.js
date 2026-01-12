@@ -816,11 +816,22 @@ function showUserTypingIndicator() {
     indicator.className = `typing_indicator_plus typing-user-indicator typing-position-${settings.position} typing-style-${settings.style} visible`;
     indicator.innerHTML = htmlContent;
 
-    // Hide after 2 seconds of no typing
+    // Hide after 600ms of no typing
     userTypingTimeout = setTimeout(() => {
-        const el = document.getElementById('typing_indicator_user');
-        if (el) el.remove();
-    }, 2000);
+        hideUserTypingIndicator();
+    }, 600);
+}
+
+/**
+ * Hide user typing indicator immediately
+ */
+function hideUserTypingIndicator() {
+    if (userTypingTimeout) {
+        clearTimeout(userTypingTimeout);
+        userTypingTimeout = null;
+    }
+    const el = document.getElementById('typing_indicator_user');
+    if (el) el.remove();
 }
 
 // Initialize
@@ -833,6 +844,9 @@ function showUserTypingIndicator() {
 
     showEvents.forEach(e => eventSource.on(e, showTypingIndicator));
     hideEvents.forEach(e => eventSource.on(e, hideTypingIndicator));
+
+    // Hide user typing indicator when message is sent
+    eventSource.on(event_types.MESSAGE_SENT, hideUserTypingIndicator);
 
     // User typing indicator - listen to input events
     const textarea = document.getElementById('send_textarea');
