@@ -316,22 +316,26 @@ function generateDotsAnimation(theme, style) {
  * @param {TypingIndicatorSettings} settings
  * @returns {string} HTML content
  */
-function generateIndicatorHTML(settings) {
-    const charName = name2 || 'Character';
-    const text = settings.customText.replace(/\{\{char\}\}/gi, charName);
-    const avatarUrl = settings.showAvatar ? getCharacterAvatar() : '';
+function generateIndicatorHTML(settings, isUser = false) {
+    const name = isUser ? (name1 || 'You') : (name2 || 'Character');
+    const text = isUser
+        ? (settings.userCustomText || '{{user}} is typing...').replace(/\{\{user\}\}/gi, name)
+        : (settings.customText || '{{char}} is typing...').replace(/\{\{char\}\}/gi, name);
+    const avatarUrl = isUser
+        ? (settings.showUserAvatar ? getUserAvatar() : '')
+        : (settings.showAvatar ? getCharacterAvatar() : '');
     const dots = generateDotsAnimation(settings.animationTheme, settings.style);
 
     const avatarHTML = avatarUrl ? `
         <div class="typing-avatar ${settings.style === 'pulsing_avatar' ? 'pulsing' : ''}">
-            <img src="${avatarUrl}" alt="${charName}" onerror="this.style.display='none'" />
+            <img src="${avatarUrl}" alt="${name}" onerror="this.style.display='none'" />
         </div>
     ` : '';
 
     // Fallback avatar with initial
     const fallbackAvatar = `
         <div class="typing-avatar pulsing placeholder">
-            <span>${charName.charAt(0).toUpperCase()}</span>
+            <span>${name.charAt(0).toUpperCase()}</span>
         </div>
     `;
 
@@ -353,7 +357,7 @@ function generateIndicatorHTML(settings) {
                     ${avatarHTML}
                     <div class="typing-bouncing-content">
                         ${dots}
-                        <span class="typing-text-small">${charName}</span>
+                        <span class="typing-text-small">${name}</span>
                     </div>
                 </div>
             `;
@@ -391,7 +395,7 @@ function generateIndicatorHTML(settings) {
                         <div class="discord-dots">
                             <span></span><span></span><span></span>
                         </div>
-                        <span class="typing-text-discord"><strong>${charName}</strong> is typing...</span>
+                        <span class="typing-text-discord"><strong>${name}</strong> is typing...</span>
                     </div>
                 </div>
             `;
@@ -428,8 +432,7 @@ function showTypingIndicator(type, _args, dryRun) {
 
     // Clear any existing timers
     clearTimers();
-
-    const htmlContent = generateIndicatorHTML(settings);
+    const htmlContent = generateIndicatorHTML(settings, false);
     const positionClass = `typing-position-${settings.position}`;
     const styleClass = `typing-style-${settings.style}`;
     const themeClass = `typing-theme-${settings.animationTheme}`;
@@ -794,24 +797,14 @@ function showUserTypingIndicator() {
         clearTimeout(userTypingTimeout);
     }
 
-    // Get persona name and avatar
-    const userName = name1 || 'You';
-    const userText = (settings.userCustomText || '{{user}} is typing...').replace(/\{\{user\}\}/gi, userName);
-    const avatarUrl = settings.showUserAvatar ? getUserAvatar() : '';
-
-    // Build avatar HTML
-    const avatarHTML = avatarUrl ? `
-        <div class="typing-avatar">
-            <img src="${avatarUrl}" alt="${userName}" onerror="this.style.display='none'" />
-        </div>
-    ` : '';
+    // Get indicator content
+    const htmlContent = generateIndicatorHTML(settings, true);
 
     // Check if user indicator already exists
     let indicator = document.getElementById('typing_indicator_user');
     if (!indicator) {
         indicator = document.createElement('div');
         indicator.id = 'typing_indicator_user';
-        indicator.className = `typing_indicator_plus typing-user-indicator typing-position-${settings.position} typing-style-${settings.style} visible`;
 
         const sendForm = document.getElementById('send_form');
         if (sendForm) {
@@ -819,26 +812,9 @@ function showUserTypingIndicator() {
         }
     }
 
-    // Update content
-    indicator.innerHTML = `
-        <div class="typing-content-wrapper">
-            ${avatarHTML}
-            <span class="typing-text">${userText}</span>
-            <span class="typing-dots-container">
-                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="16" viewBox="0 0 28 16">
-                    <style>
-                        @keyframes userDot { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
-                        .ud1 { animation: userDot 1.4s ease-in-out 0s infinite; }
-                        .ud2 { animation: userDot 1.4s ease-in-out 0.15s infinite; }
-                        .ud3 { animation: userDot 1.4s ease-in-out 0.3s infinite; }
-                    </style>
-                    <circle class="ud1" cx="4" cy="8" r="3" fill="currentColor"/>
-                    <circle class="ud2" cx="14" cy="8" r="3" fill="currentColor"/>
-                    <circle class="ud3" cx="24" cy="8" r="3" fill="currentColor"/>
-                </svg>
-            </span>
-        </div>
-    `;
+    // Update state and content
+    indicator.className = `typing_indicator_plus typing-user-indicator typing-position-${settings.position} typing-style-${settings.style} visible`;
+    indicator.innerHTML = htmlContent;
 
     // Hide after 2 seconds of no typing
     userTypingTimeout = setTimeout(() => {
