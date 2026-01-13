@@ -1,84 +1,139 @@
-# Typing Indicator+ 
+# Typing Indicator+ ✨
 
-An enhanced typing indicator extension for SillyTavern with multiple visual styles, sound effects, and customization options.
-
-## Features
-
-- ✨ **7 Visual Styles**: Classic, Speech Bubble, Bouncing Dots, Pulsing Avatar, Wave Dots, Minimal, Discord
-
-<img width="177" height="41" alt="image" src="https://github.com/user-attachments/assets/e6b928e8-b866-4356-986f-53337f305b13" />
-<img width="162" height="49" alt="image" src="https://github.com/user-attachments/assets/060d32c7-b222-4397-ab75-a933b500e3b8" />
-<img width="152" height="63" alt="image" src="https://github.com/user-attachments/assets/322016a3-4aea-4eda-b628-4848235f2209" />  
-
-- 🎨 **4 Animation Themes**: Smooth, Playful, Minimal, Wave
-- 🖼️ **Character / Persona Avatar Support**: Shows the character or persona's avatar in the indicator
-<img width="208" height="51" alt="image" src="https://github.com/user-attachments/assets/f78c1057-4e99-478a-97b3-ffb4d45a8067" />
-
-
-- 📍 **3 Position Options**: Bottom (sticky), Inline (after messages):
-<img width="1217" height="104" alt="image" src="https://github.com/user-attachments/assets/80d7d0c1-cd11-4f4a-b609-66d3c05423c5" />
-
-
-- Floating (overlay):
-<img width="1248" height="124" alt="image" src="https://github.com/user-attachments/assets/2c47e19b-0f2c-4541-98fe-0388de6c7bbf" />
-
-- 🔊 **Sound Effects**: Optional typing sounds with volume control
-- ⏸️ **Realistic Pauses**: Simulate natural typing with random pauses
-- 🎯 **Custom Text**: Personalize the typing message with `{{char}}` placeholder
-- 🌊 **Streaming Support**: Works with streaming enabled!
-- 💎 **Glassmorphism Design**: Premium blur and gradient effects
-<img width="604" height="683" alt="image" src="https://github.com/user-attachments/assets/dc743ce4-369a-4fea-a4eb-52fd6e450c77" />
-
-
-## Installation
-
-1. Go to SillyTavern Extensions panel
-2. Install from URL: `https://github.com/Loggo-presets/TypingIndicatorPlus`
-3. Or copy this folder to `SillyTavern/public/scripts/extensions/third-party/`
-
-## Settings
-
-Access settings via **Extensions → Typing Indicator+**
-
-| Setting | Description |
-|---------|-------------|
-| Enabled | Toggle the indicator on/off |
-| Visual Style | Choose from 7 different styles |
-| Custom Text | Set your own message (use `{{char}}` for character name) |
-| Show Avatar | Display character avatar in the indicator |
-| Position | Where the indicator appears |
-| Animation Theme | Animation style for dots |
-| Typing Sounds | Enable/disable sound effects |
-| Sound Volume | Adjust volume (0-100%) |
-| Simulate Pauses | Add random pauses for realism |
-
-## Changelog
-
-### v2.0.0
-- Complete rewrite with premium features
-- Added 7 visual styles
-- Added 4 animation themes
-- Added character avatar support
-- Added position options
-- Added sound effects
-- Added pause simulation
-- Fixed streaming compatibility
-- Glassmorphism UI design
-
-### v1.0.0
-- Initial release by Cohee1207's original extension.
+A premium typing indicator extension for SillyTavern with multiple visual styles, sound effects, and extensive customization options.
 
 ---
 
-## Credits & Acknowledgments
+## ✨ Features
+
+### Visual Styles
+Choose from **7 unique styles** to match your chat aesthetic:
+
+| Style | Preview |
+|-------|---------|
+| Classic | <img width="177" alt="Classic" src="https://github.com/user-attachments/assets/e6b928e8-b866-4356-986f-53337f305b13" /> |
+| Speech Bubble | <img width="162" alt="Speech Bubble" src="https://github.com/user-attachments/assets/060d32c7-b222-4397-ab75-a933b500e3b8" /> |
+| Bouncing Dots | <img width="152" alt="Bouncing Dots" src="https://github.com/user-attachments/assets/322016a3-4aea-4eda-b628-4848235f2209" /> |
+
+### Position Options
+- **Bottom (Sticky)** - Stays at the bottom of the chat
+- **Inline** - Appears after messages
+- **Floating** - Overlay style
+
+<img width="1217" alt="Inline Position" src="https://github.com/user-attachments/assets/80d7d0c1-cd11-4f4a-b609-66d3c05423c5" />
+
+### Core Features
+- 🎨 **4 Animation Themes** - Smooth, Playful, Minimal, Wave
+- 🖼️ **Avatar Support** - Display character or persona avatars
+- 🔊 **Sound Effects** - Multiple themes with volume control
+- ⏸️ **Realistic Pauses** - Simulate natural typing behavior
+- 🌊 **Streaming Support** - Works with streaming enabled
+- 💎 **Glassmorphism Design** - Premium blur and gradient effects
+
+### v3.0 Features
+- 🧠 **Smart Thinking Detection** - Automatically shows "Thinking..." during AI reasoning
+- 🌈 **Gradient Support** - Gradient glow and name colors
+- ↔️ **User Indicator Right Alignment** - Align to match chat layout
+- ✨ **Premium Color Pickers** - Circular, modern design
+
+---
+
+## 📦 Installation
+
+### Option 1: Install from URL (Recommended)
+1. Open SillyTavern → **Extensions** panel
+2. Click **Install Extension**
+3. Paste: `https://github.com/Loggo-presets/TypingIndicatorPlus`
+
+### Option 2: Manual Install
+Copy this folder to:
+```
+SillyTavern/public/scripts/extensions/third-party/
+```
+
+---
+
+## ⚙️ Settings
+
+Access via **Extensions → Typing Indicator+**
+
+### General
+| Setting | Description |
+|---------|-------------|
+| Enabled | Toggle the indicator on/off |
+| Visual Style | Choose from 7 styles |
+| Position | Bottom, Inline, or Floating |
+| Animation Theme | Smooth, Playful, Minimal, Wave |
+
+### Character Indicator
+| Setting | Description |
+|---------|-------------|
+| Typing Text | Custom message with `{{char}}` placeholder |
+| Show Avatar | Display character avatar |
+| Show Thinking | Enable "Thinking..." detection |
+| Thinking Text/Icon | Customize thinking appearance |
+
+### User Indicator
+| Setting | Description |
+|---------|-------------|
+| Enable | Show indicator when you type |
+| Align Right | Position on right side of chat |
+| User Text | Custom message with `{{user}}` placeholder |
+
+### Visual Effects
+| Setting | Description |
+|---------|-------------|
+| Enable Glow | Glowing border effect |
+| Gradient Glow | Two-color gradient glow |
+| Gradient Names | Gradient text for names |
+
+### Sound & Advanced
+| Setting | Description |
+|---------|-------------|
+| Typing Sounds | Enable sound effects |
+| Sound Theme | iOS, Mechanical, Retro, Soft |
+| Simulate Pauses | Random typing pauses |
+| Mobile Mode | Optimized for mobile devices |
+
+---
+
+## � Changelog
+
+### v3.0.0
+**New Features:**
+- 🧠 Smart Thinking Detection with custom text/icon
+- 🌈 Gradient Glow and Gradient Name support
+- ↔️ User Indicator Right Alignment option
+- ✨ Reorganized Settings UI with 5 categories
+- 🎨 Premium circular color pickers
+
+**Bug Fixes:**
+- Fixed premature hiding during long generations
+- Fixed "stuck" thinking state issues
+- Fixed CSS syntax errors
+- Improved theme compatibility
+
+### v2.0.0
+- Complete rewrite with premium features
+- 7 visual styles, 4 animation themes
+- Character avatar support
+- Position options (Bottom, Inline, Floating)
+- Sound effects with multiple themes
+- Pause simulation
+- Streaming compatibility
+- Glassmorphism UI design
+
+### v1.0.0
+- Initial release (fork of Cohee1207's extension)
+
+---
+
+## 🙏 Credits
 
 ### Original Creator
-This extension is a fork of the original **Typing Indicator** extension created by **Cohee1207**.
+This extension is a fork of **Typing Indicator** by **Cohee1207**.
 
-- 👤 **Cohee1207** - [GitHub Profile](https://github.com/Cohee1207)
-- 📦 **Original Repository**: [SillyTavern/Extension-TypingIndicator](https://github.com/SillyTavern/Extension-TypingIndicator)
+- 👤 [Cohee1207](https://github.com/Cohee1207)
+- 📦 [Original Repository](https://github.com/SillyTavern/Extension-TypingIndicator)
 
-
-All credit for the original concept and base implementation goes to Cohee1207.
-
-
+All credit for the original concept goes to Cohee1207.
