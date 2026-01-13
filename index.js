@@ -77,6 +77,10 @@ const defaultSettings = {
     // Animation
     simulatePauses: false,
     pauseChance: 0.5,
+
+    // Timeouts
+    userTypingTimeoutMs: 600,
+    charTypingTimeoutMs: 120000,
 };
 
 // Audio context for generating click sounds
@@ -487,6 +491,12 @@ function showTypingIndicator(type, _args, dryRun) {
             }
         }, 300 + Math.random() * 200);
     }
+    setTimeout(() => {
+        const indicator = document.getElementById('typing_indicator_plus');
+        if (indicator && isIndicatorVisible) {
+            hideTypingIndicator();
+        }
+    }, settings.charTypingTimeoutMs || 120000);
 
     // Simulate pauses
     if (settings.simulatePauses) {
@@ -611,6 +621,22 @@ function addExtensionSettings(settings) {
         return wrapper;
     };
 
+    const createNumberInput = (label, value, placeholder, onChange) => {
+        const row = document.createElement('div');
+        row.classList.add('typing-setting-row');
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.classList.add('text_pole');
+        input.value = value;
+        input.min = '0';
+        input.placeholder = placeholder;
+        input.addEventListener('input', () => { onChange(Number(input.value)); saveSettingsDebounced(); });
+        row.append(lbl, input);
+        return row;
+    };
+
     // Helper to create category header
     const createHeader = (text) => {
         const header = document.createElement('div');
@@ -687,6 +713,10 @@ function addExtensionSettings(settings) {
         createCheckbox(t`Show Character Avatar`, settings.showAvatar, v => settings.showAvatar = v)
     );
 
+    inlineDrawerContent.append(
+        createNumberInput(t`Safety Timeout (ms)`, settings.charTypingTimeoutMs || 120000, '120000', v => settings.charTypingTimeoutMs = v)
+    );
+
     // ========== USER INDICATOR ==========
     inlineDrawerContent.append(createHeader('👤 User Indicator'));
 
@@ -713,6 +743,10 @@ function addExtensionSettings(settings) {
 
     inlineDrawerContent.append(
         createCheckbox(t`Show User Avatar`, settings.showUserAvatar, v => settings.showUserAvatar = v)
+    );
+
+    inlineDrawerContent.append(
+        createNumberInput(t`Idle Timeout (ms)`, settings.userTypingTimeoutMs || 600, '600', v => settings.userTypingTimeoutMs = v)
     );
 
     // ========== SOUND & ANIMATION ==========
@@ -816,10 +850,10 @@ function showUserTypingIndicator() {
         }
     }
 
-    // Hide after 600ms of no typing
+    // Hide after configured timeout
     userTypingTimeout = setTimeout(() => {
         hideUserTypingIndicator();
-    }, 600);
+    }, settings.userTypingTimeoutMs || 600);
 }
 
 /**
