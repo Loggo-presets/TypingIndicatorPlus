@@ -316,22 +316,26 @@ function generateDotsAnimation(theme, style) {
  * @param {TypingIndicatorSettings} settings
  * @returns {string} HTML content
  */
-function generateIndicatorHTML(settings) {
-    const charName = name2 || 'Character';
-    const text = settings.customText.replace(/\{\{char\}\}/gi, charName);
-    const avatarUrl = settings.showAvatar ? getCharacterAvatar() : '';
+function generateIndicatorHTML(settings, isUser = false) {
+    const name = isUser ? (name1 || 'You') : (name2 || 'Character');
+    const text = isUser
+        ? (settings.userCustomText || '{{user}} is typing...').replace(/\{\{user\}\}/gi, name)
+        : (settings.customText || '{{char}} is typing...').replace(/\{\{char\}\}/gi, name);
+    const avatarUrl = isUser
+        ? (settings.showUserAvatar ? getUserAvatar() : '')
+        : (settings.showAvatar ? getCharacterAvatar() : '');
     const dots = generateDotsAnimation(settings.animationTheme, settings.style);
 
     const avatarHTML = avatarUrl ? `
         <div class="typing-avatar ${settings.style === 'pulsing_avatar' ? 'pulsing' : ''}">
-            <img src="${avatarUrl}" alt="${charName}" onerror="this.style.display='none'" />
+            <img src="${avatarUrl}" alt="${name}" onerror="this.style.display='none'" />
         </div>
     ` : '';
 
     // Fallback avatar with initial
     const fallbackAvatar = `
         <div class="typing-avatar pulsing placeholder">
-            <span>${charName.charAt(0).toUpperCase()}</span>
+            <span>${name.charAt(0).toUpperCase()}</span>
         </div>
     `;
 
@@ -353,7 +357,7 @@ function generateIndicatorHTML(settings) {
                     ${avatarHTML}
                     <div class="typing-bouncing-content">
                         ${dots}
-                        <span class="typing-text-small">${charName}</span>
+                        <span class="typing-text-small">${name}</span>
                     </div>
                 </div>
             `;
@@ -391,7 +395,7 @@ function generateIndicatorHTML(settings) {
                         <div class="discord-dots">
                             <span></span><span></span><span></span>
                         </div>
-                        <span class="typing-text-discord"><strong>${charName}</strong> is typing...</span>
+                        <span class="typing-text-discord"><strong>${name}</strong> is typing...</span>
                     </div>
                 </div>
             `;
@@ -399,40 +403,10 @@ function generateIndicatorHTML(settings) {
         case 'classic':
         default:
             return `
-                <div class="typing-content-wrapper typing-classic-wrapper">
-                    ${avatarHTML}
-                    <span class="typing-text">${text}</span>
-                    ${dots}
-                </div>
-            `;
-    }
-}
-
-/**
- * Shows a typing indicator in the chat.
- * @param {string} type Generation type
- * @param {any} _args Generation arguments
- * @param {boolean} dryRun Is this a dry run?
- */
-function showTypingIndicator(type, _args, dryRun) {
-    const settings = getSettings();
-    const noIndicatorTypes = ['quiet', 'impersonate'];
-
-    if (noIndicatorTypes.includes(type) || dryRun) {
-        return;
-    }
-
-    if (!settings.enabled || !name2) {
-        return;
-    }
-
-    // Clear any existing timers
-    clearTimers();
-
-    const htmlContent = generateIndicatorHTML(settings);
-    const positionClass = `typing-position-${settings.position}`;
-    const styleClass = `typing-style-${settings.style}`;
-    const themeClass = `typing-theme-${settings.animationTheme}`;
+    const htmlContent = generateIndicatorHTML(settings, false);
+    const positionClass = `typing - position - ${ settings.position } `;
+    const styleClass = `typing - style - ${ settings.style } `;
+    const themeClass = `typing - theme - ${ settings.animationTheme } `;
 
     // Check if indicator already exists
     let typingIndicator = document.getElementById('typing_indicator_plus');
@@ -440,14 +414,14 @@ function showTypingIndicator(type, _args, dryRun) {
     if (typingIndicator) {
         // Update existing
         typingIndicator.innerHTML = htmlContent;
-        typingIndicator.className = `typing_indicator_plus ${positionClass} ${styleClass} ${themeClass} visible`;
+        typingIndicator.className = `typing_indicator_plus ${ positionClass } ${ styleClass } ${ themeClass } visible`;
         return;
     }
 
     // Create new indicator
     typingIndicator = document.createElement('div');
     typingIndicator.id = 'typing_indicator_plus';
-    typingIndicator.className = `typing_indicator_plus ${positionClass} ${styleClass} ${themeClass}`;
+    typingIndicator.className = `typing_indicator_plus ${ positionClass } ${ styleClass } ${ themeClass } `;
     typingIndicator.innerHTML = htmlContent;
 
     const chat = document.getElementById('chat');
@@ -562,7 +536,7 @@ function addExtensionSettings(settings) {
     inlineDrawerToggle.classList.add('inline-drawer-toggle', 'inline-drawer-header');
 
     const extensionName = document.createElement('b');
-    extensionName.textContent = t`Typing Indicator+`;
+    extensionName.textContent = t`Typing Indicator + `;
 
     const inlineDrawerIcon = document.createElement('div');
     inlineDrawerIcon.classList.add('inline-drawer-icon', 'fa-solid', 'fa-circle-chevron-down', 'down');
@@ -653,7 +627,7 @@ function addExtensionSettings(settings) {
 
     // Mobile mode toggle
     inlineDrawerContent.append(
-        createCheckbox(t`Mobile-optimized mode`, settings.mobileMode, v => {
+        createCheckbox(t`Mobile - optimized mode`, settings.mobileMode, v => {
             settings.mobileMode = v;
             updateMobileMode(v);
         })
@@ -765,7 +739,7 @@ function getUserAvatar() {
     // Try to get from user_avatar global
     if (user_avatar && typeof user_avatar === 'string') {
         // user_avatar contains just the filename, need to build full path
-        return `/User Avatars/${user_avatar}`;
+        return `/ User Avatars / ${ user_avatar } `;
     }
 
     // Try to get from user's last message
@@ -785,32 +759,23 @@ function getUserAvatar() {
  */
 let userTypingTimeout = null;
 function showUserTypingIndicator() {
-    const settings = getSettings();
-    if (!settings.enabled || !settings.userTypingEnabled) return;
-
     // Clear existing timeout
     if (userTypingTimeout) {
         clearTimeout(userTypingTimeout);
+        userTypingTimeout = null;
     }
 
-    // Get persona name and avatar
-    const userName = name1 || 'You';
-    const userText = (settings.userCustomText || '{{user}} is typing...').replace(/\{\{user\}\}/gi, userName);
-    const avatarUrl = settings.showUserAvatar ? getUserAvatar() : '';
-
-    // Build avatar HTML
-    const avatarHTML = avatarUrl ? `
-        <div class="typing-avatar">
-            <img src="${avatarUrl}" alt="${userName}" onerror="this.style.display='none'" />
-        </div>
-    ` : '';
-
-    // Check if user indicator already exists
     let indicator = document.getElementById('typing_indicator_user');
+
+    // Only update DOM if indicator doesn't exist
     if (!indicator) {
+        // Get indicator content with unified styling
+        const htmlContent = generateIndicatorHTML(settings, true);
+        
         indicator = document.createElement('div');
         indicator.id = 'typing_indicator_user';
-        indicator.className = `typing_indicator_plus typing-user-indicator typing-position-${settings.position} typing-style-${settings.style} visible`;
+        indicator.className = `typing_indicator_plus typing - user - indicator typing - position - ${ settings.position } typing - style - ${ settings.style } visible`;
+        indicator.innerHTML = htmlContent;
 
         const sendForm = document.getElementById('send_form');
         if (sendForm) {
@@ -818,32 +783,22 @@ function showUserTypingIndicator() {
         }
     }
 
-    // Update content
-    indicator.innerHTML = `
-        <div class="typing-content-wrapper">
-            ${avatarHTML}
-            <span class="typing-text">${userText}</span>
-            <span class="typing-dots-container">
-                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="16" viewBox="0 0 28 16">
-                    <style>
-                        @keyframes userDot { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
-                        .ud1 { animation: userDot 1.4s ease-in-out 0s infinite; }
-                        .ud2 { animation: userDot 1.4s ease-in-out 0.15s infinite; }
-                        .ud3 { animation: userDot 1.4s ease-in-out 0.3s infinite; }
-                    </style>
-                    <circle class="ud1" cx="4" cy="8" r="3" fill="currentColor"/>
-                    <circle class="ud2" cx="14" cy="8" r="3" fill="currentColor"/>
-                    <circle class="ud3" cx="24" cy="8" r="3" fill="currentColor"/>
-                </svg>
-            </span>
-        </div>
-    `;
-
-    // Hide after 2 seconds of no typing
+    // Hide after 600ms of no typing
     userTypingTimeout = setTimeout(() => {
-        const el = document.getElementById('typing_indicator_user');
-        if (el) el.remove();
-    }, 2000);
+        hideUserTypingIndicator();
+    }, 600);
+}
+
+/**
+ * Hide user typing indicator immediately
+ */
+function hideUserTypingIndicator() {
+    if (userTypingTimeout) {
+        clearTimeout(userTypingTimeout);
+        userTypingTimeout = null;
+    }
+    const el = document.getElementById('typing_indicator_user');
+    if (el) el.remove();
 }
 
 // Initialize
@@ -856,6 +811,9 @@ function showUserTypingIndicator() {
 
     showEvents.forEach(e => eventSource.on(e, showTypingIndicator));
     hideEvents.forEach(e => eventSource.on(e, hideTypingIndicator));
+    
+    // Hide user typing indicator when message is sent
+    eventSource.on(event_types.MESSAGE_SENT, hideUserTypingIndicator);
 
     // User typing indicator - listen to input events
     const textarea = document.getElementById('send_textarea');
