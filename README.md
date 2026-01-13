@@ -1,6 +1,6 @@
 # Typing Indicator+ ✨
 
-A premium typing indicator extension for SillyTavern with multiple visual styles, sound effects, and extensive customization options.
+An enhanced typing indicator extension for SillyTavern with multiple visual styles, sound effects, and extensive customization options.
 
 ---
 
@@ -32,6 +32,11 @@ Choose from **7 unique styles** to match your chat aesthetic:
 
 ### v3.0 Features
 - 🧠 **Smart Thinking Detection** - Automatically shows "Thinking..." during AI reasoning
+
+| Style | Preview |
+|-------|---------|
+| Thinking version | <img width="190" height="49" alt="image" src="https://github.com/user-attachments/assets/7e95ea7b-9a5d-46b2-9611-eea9825c1b1c" /> |
+
 - 🌈 **Gradient Support** - Gradient glow and name colors
 - ↔️ **User Indicator Right Alignment** - Align to match chat layout
 - ✨ **Premium Color Pickers** - Circular, modern design
