@@ -21,6 +21,8 @@ Choose from **7 unique styles** to match your chat aesthetic:
 - **Floating** - Overlay style
 
 <img width="1217" alt="Inline Position" src="https://github.com/user-attachments/assets/80d7d0c1-cd11-4f4a-b609-66d3c05423c5" />
+<img width="1213" height="129" alt="image" src="https://github.com/user-attachments/assets/f618a76b-9004-48c5-a0f3-1d8eb4ab70af" />
+
 
 ### Core Features
 - 🎨 **4 Animation Themes** - Smooth, Playful, Minimal, Wave
@@ -142,3 +144,4 @@ This extension is a fork of **Typing Indicator** by **Cohee1207**.
 - 📦 [Original Repository](https://github.com/SillyTavern/Extension-TypingIndicator)
 
 All credit for the original concept goes to Cohee1207.
+
