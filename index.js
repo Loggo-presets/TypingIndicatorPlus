@@ -30,6 +30,7 @@ import {
     name1,
     name2,
     user_avatar,
+    chat,
     eventSource,
     event_types,
     saveSettingsDebounced,
@@ -63,6 +64,8 @@ const defaultSettings = {
 
     // Character Indicator
     customText: '{{char}} is typing...',
+    customThinkingText: '{{char}} is thinking...',
+    thinkingIcon: '🧠',
     showAvatar: true,
 
     // User Indicator  
@@ -80,7 +83,27 @@ const defaultSettings = {
 
     // Timeouts
     userTypingTimeoutMs: 600,
-    charTypingTimeoutMs: 120000,
+
+    // v3.0.0 Features
+    soundTheme: 'ios',
+    showThinking: true,  // Experimental thinking detection
+    groupChatSupport: false,
+
+    // Glow settings
+    glowEnabled: true,
+    glowGradient: false,
+    glowColor: '#738adb',
+    glowColor2: '#a855f7',
+    userGlowColor: '#5cb85c',
+    userGlowColor2: '#22c55e',
+    userRightAlign: false, // New feature: align user indicator to right
+
+    // Name color settings
+    nameGradient: false,
+    charNameColor: '#738adb',
+    charNameColor2: '#a855f7',
+    userNameColor: '#5cb85c',
+    userNameColor2: '#22c55e',
 };
 
 // Audio context for generating click sounds
@@ -103,6 +126,9 @@ function initAudioContext() {
 let pauseTimeout = null;
 let soundInterval = null;
 let isIndicatorVisible = false;
+let isCharThinking = false;
+let typingCharacters = new Set(); // For Group Chat support
+let thinkingObserver = null;      // MutationObserver for thinking icon
 
 /**
  * Get the settings for this extension.
@@ -159,15 +185,15 @@ function getCharacterAvatar() {
 }
 
 /**
- * Play typing sound effect using Web Audio API - iPhone keyboard style
+ * Play typing sound effect using Web Audio API
  * @param {number} volume Volume level (0-1)
+ * @param {string} theme Sound theme
  */
-function playTypingSound(volume) {
+function playTypingSound(volume, theme = 'ios') {
     try {
         const ctx = initAudioContext();
         if (!ctx) return;
 
-        // Resume context if suspended (browser autoplay policy)
         if (ctx.state === 'suspended') {
             ctx.resume();
         }
@@ -175,69 +201,95 @@ function playTypingSound(volume) {
         const now = ctx.currentTime;
         const vol = Math.min(1, Math.max(0, volume)) * 0.25;
 
-        // === iPhone keyboard tap sound ===
-        // Consists of a short "tick" with slight variation
+        switch (theme) {
+            case 'mechanical': {
+                // Low thud
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = 'triangle';
+                osc1.frequency.setValueAtTime(100 + Math.random() * 20, now);
+                osc1.frequency.exponentialRampToValueAtTime(40, now + 0.08);
+                gain1.gain.setValueAtTime(vol * 0.8, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.1);
 
-        // Main tone - sine wave for soft tick
-        const osc1 = ctx.createOscillator();
-        const gain1 = ctx.createGain();
-        osc1.type = 'sine';
-        // iPhone tick is around 1200-1400Hz with quick drop
-        osc1.frequency.setValueAtTime(1300 + Math.random() * 100, now);
-        osc1.frequency.exponentialRampToValueAtTime(400, now + 0.025);
+                // Metallic click
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.type = 'square';
+                osc2.frequency.setValueAtTime(2500 + Math.random() * 500, now);
+                gain2.gain.setValueAtTime(vol * 0.15, now);
+                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(now);
+                osc2.stop(now + 0.02);
+                break;
+            }
+            case 'retro': {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800 + Math.random() * 100, now);
+                osc.frequency.exponentialRampToValueAtTime(400, now + 0.05);
+                gain.gain.setValueAtTime(vol * 0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.06);
+                break;
+            }
+            case 'soft': {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400 + Math.random() * 50, now);
+                gain.gain.setValueAtTime(vol * 0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.04);
+                break;
+            }
+            case 'ios':
+            default: {
+                // Original iOS style tick
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(1300 + Math.random() * 100, now);
+                osc1.frequency.exponentialRampToValueAtTime(400, now + 0.025);
+                gain1.gain.setValueAtTime(vol, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.04);
 
-        gain1.gain.setValueAtTime(0, now);
-        gain1.gain.linearRampToValueAtTime(vol, now + 0.002);
-        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
-
-        osc1.connect(gain1);
-        gain1.connect(ctx.destination);
-        osc1.start(now);
-        osc1.stop(now + 0.04);
-
-        // Secondary higher harmonic for "tap" quality
-        const osc2 = ctx.createOscillator();
-        const gain2 = ctx.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(2600 + Math.random() * 200, now);
-        osc2.frequency.exponentialRampToValueAtTime(800, now + 0.015);
-
-        gain2.gain.setValueAtTime(0, now);
-        gain2.gain.linearRampToValueAtTime(vol * 0.3, now + 0.001);
-        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
-
-        osc2.connect(gain2);
-        gain2.connect(ctx.destination);
-        osc2.start(now);
-        osc2.stop(now + 0.025);
-
-        // Subtle click noise burst
-        const bufferSize = ctx.sampleRate * 0.015; // 15ms of noise
-        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const noiseData = noiseBuffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            noiseData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.15));
+                const bufferSize = ctx.sampleRate * 0.01;
+                const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const noiseData = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    noiseData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.2));
+                }
+                const noiseSource = ctx.createBufferSource();
+                const noiseGain = ctx.createGain();
+                noiseSource.buffer = noiseBuffer;
+                noiseGain.gain.setValueAtTime(vol * 0.1, now);
+                noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.01);
+                noiseSource.connect(noiseGain);
+                noiseGain.connect(ctx.destination);
+                noiseSource.start(now);
+                break;
+            }
         }
-
-        const noiseSource = ctx.createBufferSource();
-        const noiseGain = ctx.createGain();
-        const noiseFilter = ctx.createBiquadFilter();
-
-        noiseSource.buffer = noiseBuffer;
-        noiseFilter.type = 'highpass';
-        noiseFilter.frequency.value = 3000;
-
-        noiseGain.gain.setValueAtTime(vol * 0.08, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
-
-        noiseSource.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(ctx.destination);
-        noiseSource.start(now);
-        noiseSource.stop(now + 0.02);
-
     } catch (e) {
-        // Silently fail - audio not critical
+        console.warn('Sound playback failed', e);
     }
 }
 
@@ -320,15 +372,49 @@ function generateDotsAnimation(theme, style) {
  * @param {TypingIndicatorSettings} settings
  * @returns {string} HTML content
  */
-function generateIndicatorHTML(settings, isUser = false) {
-    const name = isUser ? (name1 || 'You') : (name2 || 'Character');
+function generateIndicatorHTML(settings, isUser = false, isThinking = false) {
+    let name = isUser ? (name1 || 'You') : (name2 || 'Character');
+
+    // Group Chat support: If multiple characters are typing, update name
+    if (!isUser && settings.groupChatSupport && typingCharacters.size > 1) {
+        const names = Array.from(typingCharacters);
+        if (names.length === 2) {
+            name = `${names[0]} and ${names[1]}`;
+        } else {
+            name = `${names[0]} and ${names.length - 1} others`;
+        }
+    }
+
     const text = isUser
         ? (settings.userCustomText || '{{user}} is typing...').replace(/\{\{user\}\}/gi, name)
-        : (settings.customText || '{{char}} is typing...').replace(/\{\{char\}\}/gi, name);
+        : (isThinking && settings.showThinking
+            ? (settings.customThinkingText || '{{char}} is thinking...').replace(/{{char}}/gi, name)
+            : (settings.customText || '{{char}} is typing...').replace(/{{char}}/gi, name));
+
+    // For Discord style, we need common text without the name
+    const textSuffix = isUser
+        ? (settings.userCustomText || '{{user}} is typing...').replace(/{{user}}/gi, '').trim()
+        : (isThinking && settings.showThinking
+            ? (settings.customThinkingText || '{{char}} is thinking...').replace(/{{char}}/gi, '').trim()
+            : (settings.customText || '{{char}} is typing...').replace(/{{char}}/gi, '').trim());
+
+    // Generate name color styling
+    const nameColor1 = isUser ? (settings.userNameColor || '#5cb85c') : (settings.charNameColor || '#738adb');
+    const nameColor2 = isUser ? (settings.userNameColor2 || '#22c55e') : (settings.charNameColor2 || '#a855f7');
+    const nameStyle = settings.nameGradient
+        ? `background:linear-gradient(90deg,${nameColor1},${nameColor2});-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;`
+        : `color:${nameColor1};`;
+    const styledName = `<span style="${nameStyle}font-weight:bold;">${name}</span>`;
+
     const avatarUrl = isUser
         ? (settings.showUserAvatar ? getUserAvatar() : '')
         : (settings.showAvatar ? getCharacterAvatar() : '');
-    const dots = generateDotsAnimation(settings.animationTheme, settings.style);
+
+    // Use different dots/icon for thinking
+    const thinkingIconEmoji = settings.thinkingIcon || '🧠';
+    const dots = isThinking && settings.showThinking
+        ? `<div class="typing-thinking-icon">${thinkingIconEmoji}</div>`
+        : generateDotsAnimation(settings.animationTheme, settings.style);
 
     const avatarHTML = avatarUrl ? `
         <div class="typing-avatar ${settings.style === 'pulsing_avatar' ? 'pulsing' : ''}">
@@ -360,8 +446,8 @@ function generateIndicatorHTML(settings, isUser = false) {
                 <div class="typing-content-wrapper typing-bouncing-wrapper">
                     ${avatarHTML}
                     <div class="typing-bouncing-content">
+                        <span class="typing-text-small">${styledName}</span>
                         ${dots}
-                        <span class="typing-text-small">${name}</span>
                     </div>
                 </div>
             `;
@@ -378,8 +464,8 @@ function generateIndicatorHTML(settings, isUser = false) {
             return `
                 <div class="typing-content-wrapper typing-wave-wrapper">
                     ${avatarHTML}
-                    ${dots}
                     <span class="typing-text-fade">${text}</span>
+                    ${dots}
                 </div>
             `;
 
@@ -396,10 +482,8 @@ function generateIndicatorHTML(settings, isUser = false) {
                 <div class="typing-content-wrapper typing-discord-wrapper">
                     ${avatarHTML}
                     <div class="typing-discord-content">
-                        <div class="discord-dots">
-                            <span></span><span></span><span></span>
-                        </div>
-                        <span class="typing-text-discord"><strong>${name}</strong> is typing...</span>
+                        <span class="typing-text-discord">${styledName} ${textSuffix}</span>
+                        ${dots}
                     </div>
                 </div>
             `;
@@ -437,7 +521,15 @@ function showTypingIndicator(type, _args, dryRun) {
     // Clear any existing timers
     clearTimers();
 
-    const htmlContent = generateIndicatorHTML(settings, false);
+    // Rejoice Flow: Start as "Typing" until thinking is specifically detected
+    isCharThinking = false;
+
+    // Track character for group chat
+    if (settings.groupChatSupport && _args && _args.character_name) {
+        typingCharacters.add(_args.character_name);
+    }
+
+    const htmlContent = generateIndicatorHTML(settings, false, isCharThinking);
     const positionClass = `typing-position-${settings.position}`;
     const styleClass = `typing-style-${settings.style}`;
     const themeClass = `typing-theme-${settings.animationTheme}`;
@@ -469,6 +561,13 @@ function showTypingIndicator(type, _args, dryRun) {
     chat.appendChild(typingIndicator);
     isIndicatorVisible = true;
 
+    // Apply character glow color (or disable glow)
+    if (settings.glowEnabled !== false) {
+        typingIndicator.style.setProperty('--indicator-glow', settings.glowColor);
+    } else {
+        typingIndicator.style.setProperty('--indicator-glow', 'transparent');
+    }
+
     // Force reflow then add visible class for animation
     typingIndicator.offsetHeight;
     typingIndicator.classList.add('visible');
@@ -482,31 +581,32 @@ function showTypingIndicator(type, _args, dryRun) {
 
     // Play sound if enabled
     if (settings.soundEnabled) {
-        playTypingSound(settings.soundVolume);
+        playTypingSound(settings.soundVolume, settings.soundTheme);
 
         // Schedule repeating sounds
         soundInterval = setInterval(() => {
             if (isIndicatorVisible && settings.soundEnabled) {
-                playTypingSound(settings.soundVolume * (0.6 + Math.random() * 0.4));
+                playTypingSound(settings.soundVolume * (0.6 + Math.random() * 0.4), settings.soundTheme);
             }
         }, 300 + Math.random() * 200);
     }
-    setTimeout(() => {
-        const indicator = document.getElementById('typing_indicator_plus');
-        if (indicator && isIndicatorVisible) {
-            hideTypingIndicator();
-        }
-    }, settings.charTypingTimeoutMs || 120000);
+
+    // Start thinking detection observer (only reacts to NEW elements)
+    initThinkingObserver();
 
     // Simulate pauses
-    if (settings.simulatePauses) {
+    if (settings.simulatePauses && !isCharThinking) {
         schedulePause(settings);
     }
 }
 
 /**
- * Clear all timers
+ * Handle message chunk events
  */
+function handleMessageChunk() {
+    // No longer needed for watchdog, but keeping for potential future use
+}
+
 function clearTimers() {
     if (pauseTimeout) {
         clearTimeout(pauseTimeout);
@@ -516,6 +616,125 @@ function clearTimers() {
         clearInterval(soundInterval);
         soundInterval = null;
     }
+    if (thinkingObserver) {
+        thinkingObserver.disconnect();
+        thinkingObserver = null;
+    }
+    // Always reset thinking state when clearing
+    isCharThinking = false;
+}
+
+/**
+ * Initialize MutationObserver for thinking icon detection
+ */
+function initThinkingObserver() {
+    const settings = getSettings();
+    if (!settings.showThinking) {
+        console.log('[TIP+] showThinking is disabled, skipping observer');
+        return;
+    }
+    if (thinkingObserver) {
+        console.log('[TIP+] Observer already running');
+        return;
+    }
+
+    const chatContainer = document.getElementById('chat');
+    if (!chatContainer) {
+        console.log('[TIP+] #chat not found!');
+        return;
+    }
+
+    thinkingObserver = new MutationObserver((mutations) => {
+        if (!isIndicatorVisible) return;
+
+        // Dynamic check: Find the current last message
+        const allMessages = chatContainer.querySelectorAll('.mes');
+        const currentLastMessage = allMessages.length > 0 ? allMessages[allMessages.length - 1] : null;
+
+        if (!currentLastMessage) return;
+
+        for (const mutation of mutations) {
+            // Check for NEW reasoning details being added (thinking started)
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+
+                    // Check if this node is or contains a reasoning details element
+                    const isReasoningNode = node.classList?.contains('mes_reasoning_details');
+                    const containsReasoning = node.querySelector?.('.mes_reasoning_details');
+                    const reasoningDetails = isReasoningNode ? node : containsReasoning;
+
+                    if (reasoningDetails) {
+                        // Verify this belongs to the CURRENT last message
+                        if (!currentLastMessage.contains(reasoningDetails) && reasoningDetails !== currentLastMessage) {
+                            continue;
+                        }
+
+                        // Verify it's not already done (e.g. re-rendering old message)
+                        // STRICT CHECK: Only activate if state is explicitly "thinking"
+                        if (reasoningDetails.getAttribute('data-state') === 'thinking') {
+                            isCharThinking = true;
+                            updateThinkingUI();
+                        }
+                    }
+                }
+            }
+
+            // Check for data-state attribute changes
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-state') {
+                const target = mutation.target;
+                const dataState = target.getAttribute('data-state');
+
+                if (target.classList?.contains('mes_reasoning_details')) {
+                    // Verify this belongs to the CURRENT last message
+                    if (!currentLastMessage.contains(target)) {
+                        continue;
+                    }
+
+                    // data-state="thinking" -> Switch to Thinking
+                    if (dataState === 'thinking' && !isCharThinking) {
+                        isCharThinking = true;
+                        updateThinkingUI();
+                    }
+                    // data-state="done" -> Switch to Typing
+                    else if (dataState === 'done' && isCharThinking) {
+                        isCharThinking = false;
+                        updateThinkingUI();
+                    }
+                }
+            }
+        }
+    });
+
+    // Helper to update indicator UI
+    function updateThinkingUI() {
+        const indicator = document.getElementById('typing_indicator_plus');
+        if (indicator) {
+            const htmlContent = generateIndicatorHTML(settings, false, isCharThinking);
+            indicator.innerHTML = htmlContent;
+            console.log('[TIP+] Indicator UI updated');
+        }
+    }
+
+    thinkingObserver.observe(chatContainer, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-state']
+    });
+
+    console.log('[TIP+] MutationObserver started successfully');
+}
+
+/**
+ * Update active indicators with new glow color
+ * @param {string} color Hex color
+ */
+function updateActiveGlowColors(color) {
+    const indicators = document.querySelectorAll('.typing_indicator_plus');
+    indicators.forEach(ind => {
+        ind.style.setProperty('--indicator-glow', color);
+    });
 }
 
 /**
@@ -637,6 +856,22 @@ function addExtensionSettings(settings) {
         return row;
     };
 
+    const createColorPicker = (label, value, onChange) => {
+        const row = document.createElement('div');
+        row.classList.add('typing-setting-row');
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.classList.add('text_pole');
+        input.value = value;
+        input.style.height = '30px';
+        input.style.cursor = 'pointer';
+        input.addEventListener('input', () => { onChange(input.value); saveSettingsDebounced(); });
+        row.append(lbl, input);
+        return row;
+    };
+
     // Helper to create category header
     const createHeader = (text) => {
         const header = document.createElement('div');
@@ -681,14 +916,6 @@ function addExtensionSettings(settings) {
         ], settings.animationTheme, v => settings.animationTheme = v)
     );
 
-    // Mobile mode toggle
-    inlineDrawerContent.append(
-        createCheckbox(t`Mobile - optimized mode`, settings.mobileMode, v => {
-            settings.mobileMode = v;
-            updateMobileMode(v);
-        })
-    );
-
     // ========== CHARACTER INDICATOR ==========
     inlineDrawerContent.append(createHeader('🤖 Character Indicator'));
 
@@ -696,32 +923,63 @@ function addExtensionSettings(settings) {
     const charTextRow = document.createElement('div');
     charTextRow.classList.add('typing-setting-row');
     const charTextLabel = document.createElement('label');
-    charTextLabel.textContent = t`Custom Text`;
+    charTextLabel.textContent = t`Typing Text`;
     const charTextInput = document.createElement('input');
     charTextInput.type = 'text';
     charTextInput.classList.add('text_pole');
     charTextInput.value = settings.customText;
     charTextInput.placeholder = '{{char}} is typing...';
     charTextInput.addEventListener('input', () => { settings.customText = charTextInput.value; saveSettingsDebounced(); });
-    const charTextHint = document.createElement('small');
-    charTextHint.textContent = 'Use {{char}} for character name';
-    charTextHint.style.opacity = '0.6';
-    charTextRow.append(charTextLabel, charTextInput, charTextHint);
+    charTextRow.append(charTextLabel, charTextInput);
     inlineDrawerContent.append(charTextRow);
 
     inlineDrawerContent.append(
         createCheckbox(t`Show Character Avatar`, settings.showAvatar, v => settings.showAvatar = v)
     );
 
+    // Thinking detection subsection
     inlineDrawerContent.append(
-        createNumberInput(t`Safety Timeout (ms)`, settings.charTypingTimeoutMs || 120000, '120000', v => settings.charTypingTimeoutMs = v)
+        createCheckbox(t`Show "Thinking" Indicator`, settings.showThinking, v => settings.showThinking = v)
     );
+
+    // Thinking text for character
+    const charThinkingTextRow = document.createElement('div');
+    charThinkingTextRow.classList.add('typing-setting-row');
+    const charThinkingTextLabel = document.createElement('label');
+    charThinkingTextLabel.textContent = t`Thinking Text`;
+    const charThinkingTextInput = document.createElement('input');
+    charThinkingTextInput.type = 'text';
+    charThinkingTextInput.classList.add('text_pole');
+    charThinkingTextInput.value = settings.customThinkingText || '{{char}} is thinking...';
+    charThinkingTextInput.placeholder = '{{char}} is thinking...';
+    charThinkingTextInput.addEventListener('input', () => { settings.customThinkingText = charThinkingTextInput.value; saveSettingsDebounced(); });
+    charThinkingTextRow.append(charThinkingTextLabel, charThinkingTextInput);
+    inlineDrawerContent.append(charThinkingTextRow);
+
+    // Thinking icon emoji
+    const thinkingIconRow = document.createElement('div');
+    thinkingIconRow.classList.add('typing-setting-row');
+    const thinkingIconLabel = document.createElement('label');
+    thinkingIconLabel.textContent = t`Thinking Icon`;
+    const thinkingIconInput = document.createElement('input');
+    thinkingIconInput.type = 'text';
+    thinkingIconInput.classList.add('text_pole');
+    thinkingIconInput.value = settings.thinkingIcon || '🧠';
+    thinkingIconInput.placeholder = '🧠';
+    thinkingIconInput.style.width = '60px';
+    thinkingIconInput.addEventListener('input', () => { settings.thinkingIcon = thinkingIconInput.value; saveSettingsDebounced(); });
+    thinkingIconRow.append(thinkingIconLabel, thinkingIconInput);
+    inlineDrawerContent.append(thinkingIconRow);
 
     // ========== USER INDICATOR ==========
     inlineDrawerContent.append(createHeader('👤 User Indicator'));
 
     inlineDrawerContent.append(
-        createCheckbox(t`Show user typing indicator`, settings.userTypingEnabled, v => settings.userTypingEnabled = v)
+        createCheckbox(t`Enable User Typing Indicator`, settings.userTypingEnabled, v => settings.userTypingEnabled = v)
+    );
+
+    inlineDrawerContent.append(
+        createCheckbox(t`Align to Right Side`, settings.userRightAlign, v => settings.userRightAlign = v)
     );
 
     // Custom text for user
@@ -735,10 +993,7 @@ function addExtensionSettings(settings) {
     userTextInput.value = settings.userCustomText;
     userTextInput.placeholder = '{{user}} is typing...';
     userTextInput.addEventListener('input', () => { settings.userCustomText = userTextInput.value; saveSettingsDebounced(); });
-    const userTextHint = document.createElement('small');
-    userTextHint.textContent = 'Use {{user}} for persona name';
-    userTextHint.style.opacity = '0.6';
-    userTextRow.append(userTextLabel, userTextInput, userTextHint);
+    userTextRow.append(userTextLabel, userTextInput);
     inlineDrawerContent.append(userTextRow);
 
     inlineDrawerContent.append(
@@ -749,8 +1004,117 @@ function addExtensionSettings(settings) {
         createNumberInput(t`Idle Timeout (ms)`, settings.userTypingTimeoutMs || 600, '600', v => settings.userTypingTimeoutMs = v)
     );
 
-    // ========== SOUND & ANIMATION ==========
-    inlineDrawerContent.append(createHeader('🔊 Sound & Animation'));
+    // ========== VISUAL EFFECTS ==========
+    inlineDrawerContent.append(createHeader('✨ Visual Effects'));
+
+    // Glow settings with toggle
+    const glowCheckbox = createCheckbox(t`Enable Glow Effect`, settings.glowEnabled !== false, v => {
+        settings.glowEnabled = v;
+        glowGradientRow.style.display = v ? 'flex' : 'none';
+        glowCharRow.style.display = v ? 'flex' : 'none';
+        glowUserRow.style.display = v ? 'flex' : 'none';
+    });
+    inlineDrawerContent.append(glowCheckbox);
+
+    // Glow gradient toggle
+    const glowGradientRow = createCheckbox(t`Gradient Glow`, settings.glowGradient || false, v => {
+        settings.glowGradient = v;
+        glowChar2Input.style.display = v ? 'inline-block' : 'none';
+        glowUser2Input.style.display = v ? 'inline-block' : 'none';
+        saveSettingsDebounced();
+    });
+    glowGradientRow.style.display = settings.glowEnabled !== false ? 'flex' : 'none';
+    inlineDrawerContent.append(glowGradientRow);
+
+    // Char glow colors
+    const glowCharRow = document.createElement('div');
+    glowCharRow.classList.add('typing-setting-row');
+    glowCharRow.style.display = settings.glowEnabled !== false ? 'flex' : 'none';
+    const glowCharLabel = document.createElement('label');
+    glowCharLabel.textContent = t`Character Glow`;
+    const glowCharInput = document.createElement('input');
+    glowCharInput.type = 'color';
+    glowCharInput.value = settings.glowColor || '#738adb';
+    glowCharInput.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;';
+    glowCharInput.addEventListener('input', () => { settings.glowColor = glowCharInput.value; updateActiveGlowColors(glowCharInput.value); saveSettingsDebounced(); });
+    const glowChar2Input = document.createElement('input');
+    glowChar2Input.type = 'color';
+    glowChar2Input.value = settings.glowColor2 || '#a855f7';
+    glowChar2Input.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;margin-left:8px;';
+    glowChar2Input.style.display = settings.glowGradient ? 'inline-block' : 'none';
+    glowChar2Input.addEventListener('input', () => { settings.glowColor2 = glowChar2Input.value; saveSettingsDebounced(); });
+    glowCharRow.append(glowCharLabel, glowCharInput, glowChar2Input);
+    inlineDrawerContent.append(glowCharRow);
+
+    // User glow colors
+    const glowUserRow = document.createElement('div');
+    glowUserRow.classList.add('typing-setting-row');
+    glowUserRow.style.display = settings.glowEnabled !== false ? 'flex' : 'none';
+    const glowUserLabel = document.createElement('label');
+    glowUserLabel.textContent = t`User Glow`;
+    const glowUserInput = document.createElement('input');
+    glowUserInput.type = 'color';
+    glowUserInput.value = settings.userGlowColor || '#5cb85c';
+    glowUserInput.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;';
+    glowUserInput.addEventListener('input', () => { settings.userGlowColor = glowUserInput.value; saveSettingsDebounced(); });
+    const glowUser2Input = document.createElement('input');
+    glowUser2Input.type = 'color';
+    glowUser2Input.value = settings.userGlowColor2 || '#22c55e';
+    glowUser2Input.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;margin-left:8px;';
+    glowUser2Input.style.display = settings.glowGradient ? 'inline-block' : 'none';
+    glowUser2Input.addEventListener('input', () => { settings.userGlowColor2 = glowUser2Input.value; saveSettingsDebounced(); });
+    glowUserRow.append(glowUserLabel, glowUserInput, glowUser2Input);
+    inlineDrawerContent.append(glowUserRow);
+
+    // Name gradient toggle
+    const nameGradientCheckbox = createCheckbox(t`Gradient Name Colors`, settings.nameGradient || false, v => {
+        settings.nameGradient = v;
+        charName2Input.style.display = v ? 'inline-block' : 'none';
+        userName2Input.style.display = v ? 'inline-block' : 'none';
+        saveSettingsDebounced();
+    });
+    inlineDrawerContent.append(nameGradientCheckbox);
+
+    // Char name colors
+    const charNameRow = document.createElement('div');
+    charNameRow.classList.add('typing-setting-row');
+    const charNameLabel = document.createElement('label');
+    charNameLabel.textContent = t`Character Name`;
+    const charNameInput = document.createElement('input');
+    charNameInput.type = 'color';
+    charNameInput.value = settings.charNameColor || '#738adb';
+    charNameInput.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;';
+    charNameInput.addEventListener('input', () => { settings.charNameColor = charNameInput.value; saveSettingsDebounced(); });
+    const charName2Input = document.createElement('input');
+    charName2Input.type = 'color';
+    charName2Input.value = settings.charNameColor2 || '#a855f7';
+    charName2Input.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;margin-left:8px;';
+    charName2Input.style.display = settings.nameGradient ? 'inline-block' : 'none';
+    charName2Input.addEventListener('input', () => { settings.charNameColor2 = charName2Input.value; saveSettingsDebounced(); });
+    charNameRow.append(charNameLabel, charNameInput, charName2Input);
+    inlineDrawerContent.append(charNameRow);
+
+    // User name colors
+    const userNameRow = document.createElement('div');
+    userNameRow.classList.add('typing-setting-row');
+    const userNameLabel = document.createElement('label');
+    userNameLabel.textContent = t`User Name`;
+    const userNameInput = document.createElement('input');
+    userNameInput.type = 'color';
+    userNameInput.value = settings.userNameColor || '#5cb85c';
+    userNameInput.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;';
+    userNameInput.addEventListener('input', () => { settings.userNameColor = userNameInput.value; saveSettingsDebounced(); });
+    const userName2Input = document.createElement('input');
+    userName2Input.type = 'color';
+    userName2Input.value = settings.userNameColor2 || '#22c55e';
+    userName2Input.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;margin-left:8px;';
+    userName2Input.style.display = settings.nameGradient ? 'inline-block' : 'none';
+    userName2Input.addEventListener('input', () => { settings.userNameColor2 = userName2Input.value; saveSettingsDebounced(); });
+    userNameRow.append(userNameLabel, userNameInput, userName2Input);
+    inlineDrawerContent.append(userNameRow);
+
+    // ========== SOUND & ADVANCED ==========
+    inlineDrawerContent.append(createHeader('� Sound & Advanced'));
 
     // Sound checkbox
     const soundCheckbox = createCheckbox(t`Enable Typing Sounds`, settings.soundEnabled, v => {
@@ -775,8 +1139,29 @@ function addExtensionSettings(settings) {
     volumeRow.append(volumeLabel, volumeSlider);
     inlineDrawerContent.append(volumeRow);
 
+    // Sound Theme dropdown
+    inlineDrawerContent.append(
+        createSelect(t`Sound Theme`, [
+            { value: 'ios', label: 'iOS Click' },
+            { value: 'mechanical', label: 'Mechanical' },
+            { value: 'retro', label: 'Retro Terminal' },
+            { value: 'soft', label: 'Soft Taps' },
+        ], settings.soundTheme, v => settings.soundTheme = v)
+    );
+
     inlineDrawerContent.append(
         createCheckbox(t`Simulate Typing Pauses`, settings.simulatePauses, v => settings.simulatePauses = v)
+    );
+
+    inlineDrawerContent.append(
+        createCheckbox(t`Mobile Optimized Mode`, settings.mobileMode, v => {
+            settings.mobileMode = v;
+            updateMobileMode(v);
+        })
+    );
+
+    inlineDrawerContent.append(
+        createCheckbox(t`Group Chat Support`, settings.groupChatSupport, v => settings.groupChatSupport = v)
     );
 
     // Apply mobile mode on load
@@ -841,8 +1226,16 @@ function showUserTypingIndicator() {
 
         indicator = document.createElement('div');
         indicator.id = 'typing_indicator_user';
-        indicator.className = `typing_indicator_plus typing-user-indicator typing-position-${settings.position} typing-style-${settings.style} visible`;
+        const alignClass = settings.userRightAlign ? 'right-aligned' : '';
+        indicator.className = `typing_indicator_plus typing-user-indicator typing-position-${settings.position} typing-style-${settings.style} ${alignClass} visible`;
         indicator.innerHTML = htmlContent;
+
+        // Apply user glow color (or disable glow)
+        if (settings.glowEnabled !== false) {
+            indicator.style.setProperty('--indicator-glow', settings.userGlowColor || '#5cb85c');
+        } else {
+            indicator.style.setProperty('--indicator-glow', 'transparent');
+        }
 
         const sendForm = document.getElementById('send_form');
         if (sendForm) {
@@ -875,9 +1268,16 @@ function hideUserTypingIndicator() {
 
     const showEvents = [event_types.GENERATION_AFTER_COMMANDS];
     const hideEvents = [event_types.GENERATION_STOPPED, event_types.GENERATION_ENDED, event_types.CHAT_CHANGED];
+    const chunkEvents = [event_types.CHARACTER_MESSAGE_RENDERED];
 
     showEvents.forEach(e => eventSource.on(e, showTypingIndicator));
-    hideEvents.forEach(e => eventSource.on(e, hideTypingIndicator));
+    hideEvents.forEach(e => {
+        eventSource.on(e, () => {
+            typingCharacters.clear();
+            hideTypingIndicator();
+        });
+    });
+    chunkEvents.forEach(e => eventSource.on(e, handleMessageChunk));
 
     // Hide user typing indicator when message is sent
     eventSource.on(event_types.MESSAGE_SENT, hideUserTypingIndicator);
