@@ -769,7 +769,7 @@ function getUserAvatar() {
     // Try to get from user_avatar global
     if (user_avatar && typeof user_avatar === 'string') {
         // user_avatar contains just the filename, need to build full path
-        return `/ User Avatars / ${user_avatar} `;
+        return `/User Avatars/${user_avatar}`;
     }
 
     // Try to get from user's last message
