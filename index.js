@@ -403,10 +403,40 @@ function generateIndicatorHTML(settings, isUser = false) {
         case 'classic':
         default:
             return `
+                <div class="typing-content-wrapper typing-classic-wrapper">
+                    ${avatarHTML}
+                    <span class="typing-text">${text}</span>
+                    ${dots}
+                </div>
+            `;
+    }
+}
+
+/**
+ * Shows a typing indicator in the chat.
+ * @param {string} type Generation type
+ * @param {any} _args Generation arguments
+ * @param {boolean} dryRun Is this a dry run?
+ */
+function showTypingIndicator(type, _args, dryRun) {
+    const settings = getSettings();
+    const noIndicatorTypes = ['quiet', 'impersonate'];
+
+    if (noIndicatorTypes.includes(type) || dryRun) {
+        return;
+    }
+
+    if (!settings.enabled || !name2) {
+        return;
+    }
+
+    // Clear any existing timers
+    clearTimers();
+
     const htmlContent = generateIndicatorHTML(settings, false);
-    const positionClass = `typing - position - ${ settings.position } `;
-    const styleClass = `typing - style - ${ settings.style } `;
-    const themeClass = `typing - theme - ${ settings.animationTheme } `;
+    const positionClass = `typing-position-${settings.position}`;
+    const styleClass = `typing-style-${settings.style}`;
+    const themeClass = `typing-theme-${settings.animationTheme}`;
 
     // Check if indicator already exists
     let typingIndicator = document.getElementById('typing_indicator_plus');
@@ -414,14 +444,14 @@ function generateIndicatorHTML(settings, isUser = false) {
     if (typingIndicator) {
         // Update existing
         typingIndicator.innerHTML = htmlContent;
-        typingIndicator.className = `typing_indicator_plus ${ positionClass } ${ styleClass } ${ themeClass } visible`;
+        typingIndicator.className = `typing_indicator_plus ${positionClass} ${styleClass} ${themeClass} visible`;
         return;
     }
 
     // Create new indicator
     typingIndicator = document.createElement('div');
     typingIndicator.id = 'typing_indicator_plus';
-    typingIndicator.className = `typing_indicator_plus ${ positionClass } ${ styleClass } ${ themeClass } `;
+    typingIndicator.className = `typing_indicator_plus ${positionClass} ${styleClass} ${themeClass} `;
     typingIndicator.innerHTML = htmlContent;
 
     const chat = document.getElementById('chat');
@@ -739,7 +769,7 @@ function getUserAvatar() {
     // Try to get from user_avatar global
     if (user_avatar && typeof user_avatar === 'string') {
         // user_avatar contains just the filename, need to build full path
-        return `/ User Avatars / ${ user_avatar } `;
+        return `/ User Avatars / ${user_avatar} `;
     }
 
     // Try to get from user's last message
@@ -759,6 +789,9 @@ function getUserAvatar() {
  */
 let userTypingTimeout = null;
 function showUserTypingIndicator() {
+    const settings = getSettings();
+    if (!settings.enabled || !settings.userTypingEnabled) return;
+
     // Clear existing timeout
     if (userTypingTimeout) {
         clearTimeout(userTypingTimeout);
@@ -771,10 +804,10 @@ function showUserTypingIndicator() {
     if (!indicator) {
         // Get indicator content with unified styling
         const htmlContent = generateIndicatorHTML(settings, true);
-        
+
         indicator = document.createElement('div');
         indicator.id = 'typing_indicator_user';
-        indicator.className = `typing_indicator_plus typing - user - indicator typing - position - ${ settings.position } typing - style - ${ settings.style } visible`;
+        indicator.className = `typing_indicator_plus typing-user-indicator typing-position-${settings.position} typing-style-${settings.style} visible`;
         indicator.innerHTML = htmlContent;
 
         const sendForm = document.getElementById('send_form');
@@ -811,7 +844,7 @@ function hideUserTypingIndicator() {
 
     showEvents.forEach(e => eventSource.on(e, showTypingIndicator));
     hideEvents.forEach(e => eventSource.on(e, hideTypingIndicator));
-    
+
     // Hide user typing indicator when message is sent
     eventSource.on(event_types.MESSAGE_SENT, hideUserTypingIndicator);
 
