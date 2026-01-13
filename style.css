@@ -289,6 +289,14 @@
 }
 
 /* === Settings Panel === */
+/* When SillyTavern opens the drawer, apply our flex layout */
+.inline-drawer-content[style*="display: block"],
+.inline-drawer-content[style*="display:block"] {
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
+}
+
 .typing-setting-row {
     display: flex;
     flex-direction: column;
