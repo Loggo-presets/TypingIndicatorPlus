@@ -72,6 +72,8 @@ const defaultSettings = {
     userTypingEnabled: false,
     userCustomText: '{{user}} is typing...',
     showUserAvatar: true,
+    userSoundEnabled: false,
+    userSoundTheme: 'ios',
 
     // Sound
     soundEnabled: false,
@@ -88,6 +90,8 @@ const defaultSettings = {
     soundTheme: 'ios',
     showThinking: true,  // Experimental thinking detection
     groupChatSupport: false,
+    dynamicRhythm: false,      // More varied sound timing
+    soundOnStreamStart: false, // Wait for streaming to start before playing sounds
 
     // Glow settings
     glowEnabled: true,
@@ -129,6 +133,7 @@ let isIndicatorVisible = false;
 let isCharThinking = false;
 let typingCharacters = new Set(); // For Group Chat support
 let thinkingObserver = null;      // MutationObserver for thinking icon
+let soundsPendingStream = false;  // Flag for streaming-aware sounds
 
 /**
  * Get the settings for this extension.
@@ -379,16 +384,16 @@ function generateDotsAnimation(theme, style) {
     // SVG dots for most styles
     return `
         <span class="typing-dots-container">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="16" viewBox="0 0 28 16">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="16" viewBox="0 0 32 16" style="overflow:visible;">
                 <style>
                     ${anim.keyframes}
                     .typing-dot-1 { animation: ${animName} ${anim.duration} ${anim.timing} 0s infinite; }
                     .typing-dot-2 { animation: ${animName} ${anim.duration} ${anim.timing} 0.15s infinite; }
                     .typing-dot-3 { animation: ${animName} ${anim.duration} ${anim.timing} 0.3s infinite; }
                 </style>
-                <circle class="typing-dot-1" cx="4" cy="8" r="3" fill="currentColor"/>
-                <circle class="typing-dot-2" cx="14" cy="8" r="3" fill="currentColor"/>
-                <circle class="typing-dot-3" cx="24" cy="8" r="3" fill="currentColor"/>
+                <circle class="typing-dot-1" cx="6" cy="8" r="3" fill="currentColor"/>
+                <circle class="typing-dot-2" cx="16" cy="8" r="3" fill="currentColor"/>
+                <circle class="typing-dot-3" cx="26" cy="8" r="3" fill="currentColor"/>
             </svg>
         </span>
     `;
@@ -608,14 +613,13 @@ function showTypingIndicator(type, _args, dryRun) {
 
     // Play sound if enabled
     if (settings.soundEnabled) {
-        playTypingSound(settings.soundVolume, settings.soundTheme);
-
-        // Schedule repeating sounds
-        soundInterval = setInterval(() => {
-            if (isIndicatorVisible && settings.soundEnabled) {
-                playTypingSound(settings.soundVolume * (0.6 + Math.random() * 0.4), settings.soundTheme);
-            }
-        }, 300 + Math.random() * 200);
+        if (settings.soundOnStreamStart) {
+            // Defer sound until streaming starts
+            soundsPendingStream = true;
+        } else {
+            // Play immediately
+            startTypingSounds(settings);
+        }
     }
 
     // Start thinking detection observer (only reacts to NEW elements)
@@ -634,21 +638,60 @@ function handleMessageChunk() {
     // No longer needed for watchdog, but keeping for potential future use
 }
 
+/**
+ * Start typing sounds (called immediately or on stream start)
+ */
+function startTypingSounds(settings) {
+    if (soundInterval) return; // Already playing
+
+    playTypingSound(settings.soundVolume, settings.soundTheme);
+
+    // Schedule repeating sounds with optional dynamic rhythm
+    const scheduleNextSound = () => {
+        if (!isIndicatorVisible || !settings.soundEnabled) return;
+
+        const interval = settings.dynamicRhythm
+            ? 150 + Math.random() * 450  // 150-600ms varied
+            : 300 + Math.random() * 200; // 300-500ms standard
+
+        soundInterval = setTimeout(() => {
+            if (isIndicatorVisible && settings.soundEnabled) {
+                playTypingSound(settings.soundVolume * (0.6 + Math.random() * 0.4), settings.soundTheme);
+                scheduleNextSound();
+            }
+        }, interval);
+    };
+
+    scheduleNextSound();
+}
+
+/**
+ * Handle streaming token received - trigger sounds if pending
+ */
+function handleStreamToken() {
+    const settings = getSettings();
+    if (soundsPendingStream && isIndicatorVisible && settings.soundEnabled) {
+        soundsPendingStream = false;
+        startTypingSounds(settings);
+    }
+}
+
 function clearTimers() {
     if (pauseTimeout) {
         clearTimeout(pauseTimeout);
         pauseTimeout = null;
     }
     if (soundInterval) {
-        clearInterval(soundInterval);
+        clearTimeout(soundInterval); // Changed to clearTimeout for dynamic scheduling
         soundInterval = null;
     }
     if (thinkingObserver) {
         thinkingObserver.disconnect();
         thinkingObserver = null;
     }
-    // Always reset thinking state when clearing
+    // Always reset flags when clearing
     isCharThinking = false;
+    soundsPendingStream = false;
 }
 
 /**
@@ -907,14 +950,43 @@ function addExtensionSettings(settings) {
         return header;
     };
 
-    // ========== GENERAL ==========
-    inlineDrawerContent.append(createHeader('⚙️ General'));
+    // Helper to create collapsible drawer section
+    const createDrawerSection = (title, startOpen = false) => {
+        const drawer = document.createElement('div');
+        drawer.style.cssText = 'margin-top:8px;padding:8px;background:rgba(0,0,0,0.15);border-radius:6px;';
 
-    inlineDrawerContent.append(
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:4px 0;';
+        header.innerHTML = `<span style="font-weight:600;font-size:12px;">${title}</span><i class="fa-solid fa-chevron-down" style="font-size:10px;transition:transform 0.2s;"></i>`;
+
+        const content = document.createElement('div');
+        content.style.cssText = startOpen ? 'display:block;margin-top:8px;' : 'display:none;margin-top:8px;';
+
+        if (startOpen) {
+            header.querySelector('i').style.transform = 'rotate(180deg)';
+        }
+
+        let isOpen = startOpen;
+        header.addEventListener('click', () => {
+            isOpen = !isOpen;
+            content.style.display = isOpen ? 'block' : 'none';
+            header.querySelector('i').style.transform = isOpen ? 'rotate(180deg)' : '';
+        });
+
+        drawer.append(header, content);
+
+        return { drawer, content };
+    };
+
+    // ========== GENERAL ==========
+    const generalDrawer = createDrawerSection('⚙️ General', true); // Start open
+    inlineDrawerContent.append(generalDrawer.drawer);
+
+    generalDrawer.content.append(
         createCheckbox(t`Enabled`, settings.enabled, v => settings.enabled = v)
     );
 
-    inlineDrawerContent.append(
+    generalDrawer.content.append(
         createSelect(t`Visual Style`, [
             { value: 'classic', label: 'Classic' },
             { value: 'speech_bubble', label: 'Speech Bubble' },
@@ -926,7 +998,7 @@ function addExtensionSettings(settings) {
         ], settings.style, v => settings.style = v)
     );
 
-    inlineDrawerContent.append(
+    generalDrawer.content.append(
         createSelect(t`Position`, [
             { value: 'bottom', label: 'Bottom (Sticky)' },
             { value: 'inline', label: 'Inline (After Messages)' },
@@ -934,7 +1006,7 @@ function addExtensionSettings(settings) {
         ], settings.position, v => settings.position = v)
     );
 
-    inlineDrawerContent.append(
+    generalDrawer.content.append(
         createSelect(t`Animation Theme`, [
             { value: 'smooth', label: 'Smooth' },
             { value: 'playful', label: 'Playful (Bouncy)' },
@@ -944,7 +1016,8 @@ function addExtensionSettings(settings) {
     );
 
     // ========== CHARACTER INDICATOR ==========
-    inlineDrawerContent.append(createHeader('🤖 Character Indicator'));
+    const charDrawer = createDrawerSection('🤖 Character Indicator');
+    inlineDrawerContent.append(charDrawer.drawer);
 
     // Custom text for character
     const charTextRow = document.createElement('div');
@@ -958,14 +1031,14 @@ function addExtensionSettings(settings) {
     charTextInput.placeholder = '{{char}} is typing...';
     charTextInput.addEventListener('input', () => { settings.customText = charTextInput.value; saveSettingsDebounced(); });
     charTextRow.append(charTextLabel, charTextInput);
-    inlineDrawerContent.append(charTextRow);
+    charDrawer.content.append(charTextRow);
 
-    inlineDrawerContent.append(
+    charDrawer.content.append(
         createCheckbox(t`Show Character Avatar`, settings.showAvatar, v => settings.showAvatar = v)
     );
 
     // Thinking detection subsection
-    inlineDrawerContent.append(
+    charDrawer.content.append(
         createCheckbox(t`Show "Thinking" Indicator`, settings.showThinking, v => settings.showThinking = v)
     );
 
@@ -981,7 +1054,7 @@ function addExtensionSettings(settings) {
     charThinkingTextInput.placeholder = '{{char}} is thinking...';
     charThinkingTextInput.addEventListener('input', () => { settings.customThinkingText = charThinkingTextInput.value; saveSettingsDebounced(); });
     charThinkingTextRow.append(charThinkingTextLabel, charThinkingTextInput);
-    inlineDrawerContent.append(charThinkingTextRow);
+    charDrawer.content.append(charThinkingTextRow);
 
     // Thinking icon emoji
     const thinkingIconRow = document.createElement('div');
@@ -996,16 +1069,17 @@ function addExtensionSettings(settings) {
     thinkingIconInput.style.width = '60px';
     thinkingIconInput.addEventListener('input', () => { settings.thinkingIcon = thinkingIconInput.value; saveSettingsDebounced(); });
     thinkingIconRow.append(thinkingIconLabel, thinkingIconInput);
-    inlineDrawerContent.append(thinkingIconRow);
+    charDrawer.content.append(thinkingIconRow);
 
     // ========== USER INDICATOR ==========
-    inlineDrawerContent.append(createHeader('👤 User Indicator'));
+    const userDrawer = createDrawerSection('👤 User Indicator');
+    inlineDrawerContent.append(userDrawer.drawer);
 
-    inlineDrawerContent.append(
+    userDrawer.content.append(
         createCheckbox(t`Enable User Typing Indicator`, settings.userTypingEnabled, v => settings.userTypingEnabled = v)
     );
 
-    inlineDrawerContent.append(
+    userDrawer.content.append(
         createCheckbox(t`Align to Right Side`, settings.userRightAlign, v => settings.userRightAlign = v)
     );
 
@@ -1021,134 +1095,155 @@ function addExtensionSettings(settings) {
     userTextInput.placeholder = '{{user}} is typing...';
     userTextInput.addEventListener('input', () => { settings.userCustomText = userTextInput.value; saveSettingsDebounced(); });
     userTextRow.append(userTextLabel, userTextInput);
-    inlineDrawerContent.append(userTextRow);
+    userDrawer.content.append(userTextRow);
 
-    inlineDrawerContent.append(
+    userDrawer.content.append(
         createCheckbox(t`Show User Avatar`, settings.showUserAvatar, v => settings.showUserAvatar = v)
     );
 
-    inlineDrawerContent.append(
+    userDrawer.content.append(
         createNumberInput(t`Idle Timeout (ms)`, settings.userTypingTimeoutMs || 600, '600', v => settings.userTypingTimeoutMs = v)
     );
 
+    // User Sound settings
+    const userSoundCheckbox = createCheckbox(t`Enable User Typing Sounds`, settings.userSoundEnabled, v => {
+        settings.userSoundEnabled = v;
+        userSoundThemeRow.style.display = v ? 'block' : 'none';
+    });
+    userDrawer.content.append(userSoundCheckbox);
+
+    const userSoundThemeRow = createSelect(t`User Sound Theme`, [
+        { value: 'ios', label: 'iOS Click' },
+        { value: 'mechanical', label: 'Mechanical' },
+        { value: 'retro', label: 'Retro Terminal' },
+        { value: 'soft', label: 'Soft Taps' },
+        { value: 'osu', label: 'Osu!' },
+    ], settings.userSoundTheme || 'ios', v => settings.userSoundTheme = v);
+    userSoundThemeRow.style.display = settings.userSoundEnabled ? 'block' : 'none';
+    userDrawer.content.append(userSoundThemeRow);
+
     // ========== VISUAL EFFECTS ==========
-    inlineDrawerContent.append(createHeader('✨ Visual Effects'));
+    const visualDrawer = createDrawerSection('✨ Visual Effects');
+    inlineDrawerContent.append(visualDrawer.drawer);
 
     // Glow settings with toggle
     const glowCheckbox = createCheckbox(t`Enable Glow Effect`, settings.glowEnabled !== false, v => {
         settings.glowEnabled = v;
-        glowGradientRow.style.display = v ? 'flex' : 'none';
-        glowCharRow.style.display = v ? 'flex' : 'none';
-        glowUserRow.style.display = v ? 'flex' : 'none';
+        colorDrawer.style.display = v ? 'block' : 'none';
     });
-    inlineDrawerContent.append(glowCheckbox);
-
-    // Glow gradient toggle
-    const glowGradientRow = createCheckbox(t`Gradient Glow`, settings.glowGradient || false, v => {
-        settings.glowGradient = v;
-        glowChar2Input.style.display = v ? 'inline-block' : 'none';
-        glowUser2Input.style.display = v ? 'inline-block' : 'none';
-        saveSettingsDebounced();
-    });
-    glowGradientRow.style.display = settings.glowEnabled !== false ? 'flex' : 'none';
-    inlineDrawerContent.append(glowGradientRow);
-
-    // Char glow colors
-    const glowCharRow = document.createElement('div');
-    glowCharRow.classList.add('typing-setting-row');
-    glowCharRow.style.display = settings.glowEnabled !== false ? 'flex' : 'none';
-    const glowCharLabel = document.createElement('label');
-    glowCharLabel.textContent = t`Character Glow`;
-    const glowCharInput = document.createElement('input');
-    glowCharInput.type = 'color';
-    glowCharInput.value = settings.glowColor || '#738adb';
-    glowCharInput.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;';
-    glowCharInput.addEventListener('input', () => { settings.glowColor = glowCharInput.value; updateActiveGlowColors(glowCharInput.value); saveSettingsDebounced(); });
-    const glowChar2Input = document.createElement('input');
-    glowChar2Input.type = 'color';
-    glowChar2Input.value = settings.glowColor2 || '#a855f7';
-    glowChar2Input.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;margin-left:8px;';
-    glowChar2Input.style.display = settings.glowGradient ? 'inline-block' : 'none';
-    glowChar2Input.addEventListener('input', () => { settings.glowColor2 = glowChar2Input.value; saveSettingsDebounced(); });
-    glowCharRow.append(glowCharLabel, glowCharInput, glowChar2Input);
-    inlineDrawerContent.append(glowCharRow);
-
-    // User glow colors
-    const glowUserRow = document.createElement('div');
-    glowUserRow.classList.add('typing-setting-row');
-    glowUserRow.style.display = settings.glowEnabled !== false ? 'flex' : 'none';
-    const glowUserLabel = document.createElement('label');
-    glowUserLabel.textContent = t`User Glow`;
-    const glowUserInput = document.createElement('input');
-    glowUserInput.type = 'color';
-    glowUserInput.value = settings.userGlowColor || '#5cb85c';
-    glowUserInput.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;';
-    glowUserInput.addEventListener('input', () => { settings.userGlowColor = glowUserInput.value; saveSettingsDebounced(); });
-    const glowUser2Input = document.createElement('input');
-    glowUser2Input.type = 'color';
-    glowUser2Input.value = settings.userGlowColor2 || '#22c55e';
-    glowUser2Input.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;margin-left:8px;';
-    glowUser2Input.style.display = settings.glowGradient ? 'inline-block' : 'none';
-    glowUser2Input.addEventListener('input', () => { settings.userGlowColor2 = glowUser2Input.value; saveSettingsDebounced(); });
-    glowUserRow.append(glowUserLabel, glowUserInput, glowUser2Input);
-    inlineDrawerContent.append(glowUserRow);
+    visualDrawer.content.append(glowCheckbox);
 
     // Name gradient toggle
     const nameGradientCheckbox = createCheckbox(t`Gradient Name Colors`, settings.nameGradient || false, v => {
         settings.nameGradient = v;
-        charName2Input.style.display = v ? 'inline-block' : 'none';
-        userName2Input.style.display = v ? 'inline-block' : 'none';
+        // Toggle visibility of gradient color inputs
+        document.querySelectorAll('.tip-gradient-color').forEach(el => {
+            el.style.display = v ? 'block' : 'none';
+        });
         saveSettingsDebounced();
     });
-    inlineDrawerContent.append(nameGradientCheckbox);
+    visualDrawer.content.append(nameGradientCheckbox);
 
-    // Char name colors
-    const charNameRow = document.createElement('div');
-    charNameRow.classList.add('typing-setting-row');
-    const charNameLabel = document.createElement('label');
-    charNameLabel.textContent = t`Character Name`;
-    const charNameInput = document.createElement('input');
-    charNameInput.type = 'color';
-    charNameInput.value = settings.charNameColor || '#738adb';
-    charNameInput.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;';
-    charNameInput.addEventListener('input', () => { settings.charNameColor = charNameInput.value; saveSettingsDebounced(); });
-    const charName2Input = document.createElement('input');
-    charName2Input.type = 'color';
-    charName2Input.value = settings.charNameColor2 || '#a855f7';
-    charName2Input.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;margin-left:8px;';
-    charName2Input.style.display = settings.nameGradient ? 'inline-block' : 'none';
-    charName2Input.addEventListener('input', () => { settings.charNameColor2 = charName2Input.value; saveSettingsDebounced(); });
-    charNameRow.append(charNameLabel, charNameInput, charName2Input);
-    inlineDrawerContent.append(charNameRow);
+    // Glow gradient toggle  
+    const glowGradientCheckbox = createCheckbox(t`Gradient Glow`, settings.glowGradient || false, v => {
+        settings.glowGradient = v;
+        // Toggle visibility of glow gradient inputs
+        document.querySelectorAll('.tip-glow-gradient-color').forEach(el => {
+            el.style.display = v ? 'block' : 'none';
+        });
+        saveSettingsDebounced();
+    });
+    visualDrawer.content.append(glowGradientCheckbox);
 
-    // User name colors
-    const userNameRow = document.createElement('div');
-    userNameRow.classList.add('typing-setting-row');
-    const userNameLabel = document.createElement('label');
-    userNameLabel.textContent = t`User Name`;
-    const userNameInput = document.createElement('input');
-    userNameInput.type = 'color';
-    userNameInput.value = settings.userNameColor || '#5cb85c';
-    userNameInput.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;';
-    userNameInput.addEventListener('input', () => { settings.userNameColor = userNameInput.value; saveSettingsDebounced(); });
-    const userName2Input = document.createElement('input');
-    userName2Input.type = 'color';
-    userName2Input.value = settings.userNameColor2 || '#22c55e';
-    userName2Input.style.cssText = 'width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.2);cursor:pointer;padding:0;margin-left:8px;';
-    userName2Input.style.display = settings.nameGradient ? 'inline-block' : 'none';
-    userName2Input.addEventListener('input', () => { settings.userNameColor2 = userName2Input.value; saveSettingsDebounced(); });
-    userNameRow.append(userNameLabel, userNameInput, userName2Input);
-    inlineDrawerContent.append(userNameRow);
+    // ===== COLLAPSIBLE COLOR SETTINGS DRAWER =====
+    const colorDrawer = document.createElement('div');
+    colorDrawer.className = 'tip-color-drawer';
+    colorDrawer.style.cssText = 'margin-top:8px;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;';
+    colorDrawer.style.display = settings.glowEnabled !== false ? 'block' : 'none';
+
+    // Drawer toggle header
+    const colorDrawerHeader = document.createElement('div');
+    colorDrawerHeader.style.cssText = 'display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:4px 0;';
+    colorDrawerHeader.innerHTML = '<span style="font-weight:600;font-size:12px;">🎨 Color Settings</span><i class="fa-solid fa-chevron-down" style="font-size:10px;transition:transform 0.2s;"></i>';
+
+    const colorDrawerContent = document.createElement('div');
+    colorDrawerContent.style.cssText = 'display:none;margin-top:8px;';
+
+    let colorDrawerOpen = false;
+    colorDrawerHeader.addEventListener('click', () => {
+        colorDrawerOpen = !colorDrawerOpen;
+        colorDrawerContent.style.display = colorDrawerOpen ? 'block' : 'none';
+        colorDrawerHeader.querySelector('i').style.transform = colorDrawerOpen ? 'rotate(180deg)' : '';
+    });
+
+    colorDrawer.append(colorDrawerHeader, colorDrawerContent);
+
+    // Helper for square color input
+    const createSquareColor = (value, onChange, extraClass = '') => {
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = value;
+        input.className = extraClass;
+        input.style.cssText = 'width:36px;height:36px;border-radius:4px;border:2px solid rgba(255,255,255,0.15);cursor:pointer;padding:0;background:transparent;';
+        input.addEventListener('input', () => { onChange(input.value); saveSettingsDebounced(); });
+        return input;
+    };
+
+    // Helper for color row with grid
+    const createColorRow = (label, colors) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
+        const lbl = document.createElement('span');
+        lbl.style.cssText = 'font-size:12px;opacity:0.9;';
+        lbl.textContent = label;
+        const colorBox = document.createElement('div');
+        colorBox.style.cssText = 'display:flex;gap:6px;';
+        colors.forEach(c => colorBox.appendChild(c));
+        row.append(lbl, colorBox);
+        return row;
+    };
+
+    // Character Glow colors
+    const charGlow1 = createSquareColor(settings.glowColor || '#738adb', v => { settings.glowColor = v; updateActiveGlowColors(v); });
+    const charGlow2 = createSquareColor(settings.glowColor2 || '#a855f7', v => settings.glowColor2 = v, 'tip-glow-gradient-color');
+    charGlow2.style.display = settings.glowGradient ? 'block' : 'none';
+    colorDrawerContent.append(createColorRow('Character Glow', [charGlow1, charGlow2]));
+
+    // User Glow colors
+    const userGlow1 = createSquareColor(settings.userGlowColor || '#5cb85c', v => settings.userGlowColor = v);
+    const userGlow2 = createSquareColor(settings.userGlowColor2 || '#22c55e', v => settings.userGlowColor2 = v, 'tip-glow-gradient-color');
+    userGlow2.style.display = settings.glowGradient ? 'block' : 'none';
+    colorDrawerContent.append(createColorRow('User Glow', [userGlow1, userGlow2]));
+
+    // Divider
+    const divider = document.createElement('div');
+    divider.style.cssText = 'border-top:1px solid rgba(255,255,255,0.1);margin:10px 0;';
+    colorDrawerContent.append(divider);
+
+    // Character Name colors
+    const charName1 = createSquareColor(settings.charNameColor || '#738adb', v => settings.charNameColor = v);
+    const charName2 = createSquareColor(settings.charNameColor2 || '#a855f7', v => settings.charNameColor2 = v, 'tip-gradient-color');
+    charName2.style.display = settings.nameGradient ? 'block' : 'none';
+    colorDrawerContent.append(createColorRow('Character Name', [charName1, charName2]));
+
+    // User Name colors
+    const userName1 = createSquareColor(settings.userNameColor || '#5cb85c', v => settings.userNameColor = v);
+    const userName2 = createSquareColor(settings.userNameColor2 || '#22c55e', v => settings.userNameColor2 = v, 'tip-gradient-color');
+    userName2.style.display = settings.nameGradient ? 'block' : 'none';
+    colorDrawerContent.append(createColorRow('User Name', [userName1, userName2]));
+
+    visualDrawer.content.append(colorDrawer);
 
     // ========== SOUND & ADVANCED ==========
-    inlineDrawerContent.append(createHeader('� Sound & Advanced'));
+    const soundDrawer = createDrawerSection('🔊 Sound & Advanced');
+    inlineDrawerContent.append(soundDrawer.drawer);
 
     // Sound checkbox
-    const soundCheckbox = createCheckbox(t`Enable Typing Sounds`, settings.soundEnabled, v => {
+    const soundCheckbox = createCheckbox(t`Enable Character Typing Sounds`, settings.soundEnabled, v => {
         settings.soundEnabled = v;
         volumeRow.style.display = v ? 'flex' : 'none';
     });
-    inlineDrawerContent.append(soundCheckbox);
+    soundDrawer.content.append(soundCheckbox);
 
     // Volume slider
     const volumeRow = document.createElement('div');
@@ -1164,11 +1259,11 @@ function addExtensionSettings(settings) {
     volumeSlider.value = String(settings.soundVolume);
     volumeSlider.addEventListener('input', () => { settings.soundVolume = parseFloat(volumeSlider.value); saveSettingsDebounced(); });
     volumeRow.append(volumeLabel, volumeSlider);
-    inlineDrawerContent.append(volumeRow);
+    soundDrawer.content.append(volumeRow);
 
     // Sound Theme dropdown
-    inlineDrawerContent.append(
-        createSelect(t`Sound Theme`, [
+    soundDrawer.content.append(
+        createSelect(t`Character Sound Theme`, [
             { value: 'ios', label: 'iOS Click' },
             { value: 'mechanical', label: 'Mechanical' },
             { value: 'retro', label: 'Retro Terminal' },
@@ -1177,19 +1272,27 @@ function addExtensionSettings(settings) {
         ], settings.soundTheme, v => settings.soundTheme = v)
     );
 
-    inlineDrawerContent.append(
+    soundDrawer.content.append(
         createCheckbox(t`Simulate Typing Pauses`, settings.simulatePauses, v => settings.simulatePauses = v)
     );
 
-    inlineDrawerContent.append(
+    soundDrawer.content.append(
+        createCheckbox(t`Dynamic Sound Rhythm`, settings.dynamicRhythm, v => settings.dynamicRhythm = v)
+    );
+
+    soundDrawer.content.append(
+        createCheckbox(t`Sound on Stream Start`, settings.soundOnStreamStart, v => settings.soundOnStreamStart = v)
+    );
+
+    soundDrawer.content.append(
         createCheckbox(t`Mobile Optimized Mode`, settings.mobileMode, v => {
             settings.mobileMode = v;
             updateMobileMode(v);
         })
     );
 
-    inlineDrawerContent.append(
-        createCheckbox(t`Group Chat Support`, settings.groupChatSupport, v => settings.groupChatSupport = v)
+    soundDrawer.content.append(
+        createCheckbox(t`Group Chat Support (Experimental)`, settings.groupChatSupport, v => settings.groupChatSupport = v)
     );
 
     // Apply mobile mode on load
@@ -1243,6 +1346,11 @@ function showUserTypingIndicator() {
     if (userTypingTimeout) {
         clearTimeout(userTypingTimeout);
         userTypingTimeout = null;
+    }
+
+    // Play sound on each keystroke if enabled
+    if (settings.userSoundEnabled) {
+        playTypingSound(settings.soundVolume * (0.7 + Math.random() * 0.3), settings.userSoundTheme || 'ios');
     }
 
     let indicator = document.getElementById('typing_indicator_user');
@@ -1306,6 +1414,9 @@ function hideUserTypingIndicator() {
         });
     });
     chunkEvents.forEach(e => eventSource.on(e, handleMessageChunk));
+
+    // Streaming token event - trigger sounds when streaming starts
+    eventSource.on(event_types.STREAM_TOKEN_RECEIVED, handleStreamToken);
 
     // Hide user typing indicator when message is sent
     eventSource.on(event_types.MESSAGE_SENT, hideUserTypingIndicator);
