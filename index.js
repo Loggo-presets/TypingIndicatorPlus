@@ -154,38 +154,95 @@ function getSettings() {
 }
 
 /**
+ * Check if an avatar URL is SillyTavern's default bot avatar (should be excluded)
+ * @param {string} src Avatar source URL
+ * @returns {boolean} True if it's a valid character avatar
+ */
+function isValidCharacterAvatar(src) {
+    if (!src) return false;
+
+    // Exclude user avatars
+    if (src.includes('User Avatars') || src.includes('user_avatar')) return false;
+
+    // Exclude SillyTavern's default bot avatars
+    // Common default avatar patterns in SillyTavern
+    if (src.includes('/img/ai4.png') ||
+        src.includes('default_bot.png') ||
+        src.includes('bot_avatar.png') ||
+        src.includes('default-user.png') ||
+        src.includes('img/ai') ||  // Default AI avatars
+        src.endsWith('ai4.png') ||
+        src.endsWith('ai1.png') ||
+        src.endsWith('ai2.png') ||
+        src.endsWith('ai3.png')) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Get the character avatar URL - comprehensive selector approach
  * @returns {string} Avatar URL or empty string
  */
 function getCharacterAvatar() {
-    // Method 1: Get from the most recent CHARACTER message (not user)
+    // Method 1: Character avatar preview (MOST RELIABLE - always reflects current character)
+    const avatarPreview = document.querySelector('#avatar_load_preview');
+    if (avatarPreview && avatarPreview.src && isValidCharacterAvatar(avatarPreview.src)) {
+        console.log('[TIP+] Avatar found from avatar_load_preview:', avatarPreview.src);
+        return avatarPreview.src;
+    }
+
+    // Method 2: Get from the most recent CHARACTER message (not user)
     // SillyTavern marks character messages with is_user="false"
     const charMsgs = document.querySelectorAll('#chat .mes[is_user="false"] .avatar img');
     if (charMsgs.length > 0) {
         const lastCharAvatar = charMsgs[charMsgs.length - 1];
-        if (lastCharAvatar && lastCharAvatar.src && !lastCharAvatar.src.includes('User Avatars')) {
+        if (lastCharAvatar && isValidCharacterAvatar(lastCharAvatar.src)) {
+            console.log('[TIP+] Avatar found from last character message:', lastCharAvatar.src);
             return lastCharAvatar.src;
         }
     }
 
-    // Method 2: Try getting from character info panel on the right
+    // Method 3: Get avatar from last message block (more generic)
+    const lastMesBlock = document.querySelector('#chat .mes:last-child[is_user="false"]');
+    if (lastMesBlock) {
+        const avatarImg = lastMesBlock.querySelector('.avatar img, img.avatar');
+        if (avatarImg && isValidCharacterAvatar(avatarImg.src)) {
+            console.log('[TIP+] Avatar found from last message block:', avatarImg.src);
+            return avatarImg.src;
+        }
+    }
+
+    // Method 4: Try getting from character info panel on the right
     const rightPanelAvatar = document.querySelector('#rm_print_characters_block .avatar img');
-    if (rightPanelAvatar && rightPanelAvatar.src) {
+    if (rightPanelAvatar && isValidCharacterAvatar(rightPanelAvatar.src)) {
+        console.log('[TIP+] Avatar found from right panel:', rightPanelAvatar.src);
         return rightPanelAvatar.src;
     }
 
-    // Method 3: Selected character in character list
+    // Method 5: Selected character in character list
     const selectedChar = document.querySelector('.character_select.selected .avatar img');
-    if (selectedChar && selectedChar.src) {
+    if (selectedChar && isValidCharacterAvatar(selectedChar.src)) {
+        console.log('[TIP+] Avatar found from selected character:', selectedChar.src);
         return selectedChar.src;
     }
 
-    // Method 4: Expression/sprite image as fallback
+    // Method 6: Character popup header
+    const characterPopup = document.querySelector('#character_popup .avatar img');
+    if (characterPopup && isValidCharacterAvatar(characterPopup.src)) {
+        console.log('[TIP+] Avatar found from character popup:', characterPopup.src);
+        return characterPopup.src;
+    }
+
+    // Method 7: Expression/sprite image as last resort
     const expression = document.querySelector('#expression-image');
-    if (expression && expression.src && expression.style.display !== 'none') {
+    if (expression && expression.src && expression.style.display !== 'none' && isValidCharacterAvatar(expression.src)) {
+        console.log('[TIP+] Avatar found from expression image:', expression.src);
         return expression.src;
     }
 
+    console.warn('[TIP+] No valid character avatar found - will use fallback placeholder');
     return '';
 }
 
@@ -465,7 +522,7 @@ function generateIndicatorHTML(settings, isUser = false, isThinking = false) {
         case 'speech_bubble':
             return `
                 <div class="typing-content-wrapper typing-bubble-wrapper">
-                    ${avatarHTML}
+                    ${avatarHTML || (settings.showAvatar || settings.showUserAvatar ? fallbackAvatar : '')}
                     <div class="typing-bubble">
                         <span class="typing-text">${text}</span>
                         ${dots}
@@ -476,7 +533,7 @@ function generateIndicatorHTML(settings, isUser = false, isThinking = false) {
         case 'bouncing_dots':
             return `
                 <div class="typing-content-wrapper typing-bouncing-wrapper">
-                    ${avatarHTML}
+                    ${avatarHTML || (settings.showAvatar || settings.showUserAvatar ? fallbackAvatar : '')}
                     <div class="typing-bouncing-content">
                         <span class="typing-text-small">${styledName}</span>
                         ${dots}
@@ -495,7 +552,7 @@ function generateIndicatorHTML(settings, isUser = false, isThinking = false) {
         case 'wave_dots':
             return `
                 <div class="typing-content-wrapper typing-wave-wrapper">
-                    ${avatarHTML}
+                    ${avatarHTML || (settings.showAvatar || settings.showUserAvatar ? fallbackAvatar : '')}
                     <span class="typing-text-fade">${text}</span>
                     ${dots}
                 </div>
@@ -512,7 +569,7 @@ function generateIndicatorHTML(settings, isUser = false, isThinking = false) {
         case 'discord':
             return `
                 <div class="typing-content-wrapper typing-discord-wrapper">
-                    ${avatarHTML}
+                    ${avatarHTML || (settings.showAvatar || settings.showUserAvatar ? fallbackAvatar : '')}
                     <div class="typing-discord-content">
                         <span class="typing-text-discord">${styledName} ${textSuffix}</span>
                         ${dots}
@@ -524,7 +581,7 @@ function generateIndicatorHTML(settings, isUser = false, isThinking = false) {
         default:
             return `
                 <div class="typing-content-wrapper typing-classic-wrapper">
-                    ${avatarHTML}
+                    ${avatarHTML || (settings.showAvatar || settings.showUserAvatar ? fallbackAvatar : '')}
                     <span class="typing-text">${text}</span>
                     ${dots}
                 </div>
