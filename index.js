@@ -78,6 +78,10 @@ const defaultSettings = {
     // Sound
     soundEnabled: false,
     soundVolume: 0.3,
+    customSoundFile: null,      // Base64 data URL for custom sound
+    userCustomSoundFile: null,  // Base64 data URL for user typing custom sound
+    userDeleteSoundEnabled: true,  // Play different sound on backspace
+    customDeleteSoundFile: null,   // Custom deletion sound upload
 
     // Animation
     simulatePauses: false,
@@ -92,6 +96,7 @@ const defaultSettings = {
     groupChatSupport: false,
     dynamicRhythm: false,      // More varied sound timing
     soundOnStreamStart: false, // Wait for streaming to start before playing sounds
+    fallbackToSynthesized: true,  // Fall back to synthesized sounds if no audio files
 
     // Glow settings
     glowEnabled: true,
@@ -134,6 +139,132 @@ let isCharThinking = false;
 let typingCharacters = new Set(); // For Group Chat support
 let thinkingObserver = null;      // MutationObserver for thinking icon
 let soundsPendingStream = false;  // Flag for streaming-aware sounds
+
+// Audio file caching
+let audioCache = {
+    osu: [],    // Array of Audio objects for random variation
+    ios: [],    // Array of Audio objects for random variation
+    // Key-specific sounds (Osu theme)
+    osuDelete: null,  // Backspace/Delete key
+    osuEnter: null,   // Enter key
+    // Key-specific sounds (iOS theme)
+    iosDelete: null,  // Backspace/Delete key
+    // Legacy/custom
+    delete: [],        // Fallback deletion sounds
+    custom: null,      // Custom uploaded sound
+    userCustom: null,  // User typing custom sound
+    deleteCustom: null // Custom deletion sound
+};
+
+/**
+ * Load bundled sound file
+ * @param {string} filename Sound file name (e.g., 'osu-1.mp3')
+ * @returns {Promise<Audio>} Audio element
+ */
+async function loadBundledSound(filename) {
+    return new Promise((resolve, reject) => {
+        // Create URL relative to this script's location
+        const soundUrl = new URL(`./sounds/${filename}`, import.meta.url).href;
+        const audio = new Audio(soundUrl);
+        audio.addEventListener('canplaythrough', () => resolve(audio), { once: true });
+        audio.addEventListener('error', (e) => {
+            console.warn(`[TIP+] Failed to load bundled sound: ${soundUrl}`, e);
+            reject(e);
+        }, { once: true });
+        audio.load();
+    });
+}
+
+/**
+ * Load custom sound from base64 data URL
+ * @param {string} dataUrl Base64 data URL
+ * @returns {Audio} Audio element
+ */
+function loadCustomSound(dataUrl) {
+    if (!dataUrl) return null;
+    try {
+        const audio = new Audio(dataUrl);
+        audio.load();
+        return audio;
+    } catch (e) {
+        console.warn('[TIP+] Failed to load custom sound', e);
+        return null;
+    }
+}
+
+/**
+ * Initialize audio files (bundled sounds)
+ */
+async function initAudioFiles() {
+    const settings = getSettings();
+
+    // Try loading bundled Osu sounds (1-4.mp3)
+    for (let i = 1; i <= 4; i++) {
+        try {
+            const audio = await loadBundledSound(`osu-${i}.mp3`);
+            audioCache.osu.push(audio);
+        } catch (e) {
+            // Silently fail - will use synthesized sounds as fallback
+        }
+    }
+
+    // Try loading bundled iOS sounds (1-2.mp3)
+    for (let i = 1; i <= 2; i++) {
+        try {
+            const audio = await loadBundledSound(`ios-${i}.mp3`);
+            audioCache.ios.push(audio);
+        } catch (e) {
+            // Silently fail - will use synthesized sounds as fallback
+        }
+    }
+
+    // Load Osu key-specific sounds
+    try { audioCache.osuDelete = await loadBundledSound('osu-delete.mp3'); } catch (e) { }
+    try { audioCache.osuEnter = await loadBundledSound('osu-enter.mp3'); } catch (e) { }
+
+    // Load iOS key-specific sounds
+    try { audioCache.iosDelete = await loadBundledSound('ios-delete-1.mp3'); } catch (e) { }
+
+    // Load custom sounds if set
+    if (settings.customSoundFile) {
+        audioCache.custom = loadCustomSound(settings.customSoundFile);
+    }
+    if (settings.userCustomSoundFile) {
+        audioCache.userCustom = loadCustomSound(settings.userCustomSoundFile);
+    }
+    if (settings.customDeleteSoundFile) {
+        audioCache.deleteCustom = loadCustomSound(settings.customDeleteSoundFile);
+    }
+
+    console.log(`[TIP+] Audio initialized: ${audioCache.osu.length} Osu, ${audioCache.ios.length} iOS, Osu-specific: ${audioCache.osuDelete ? 'del' : '-'}/${audioCache.osuEnter ? 'enter' : '-'}`);
+}
+
+/**
+ * Play audio file with volume control
+ * @param {Audio} audio Audio element to play
+ * @param {number} volume Volume level (0-1)
+ */
+function playAudioFile(audio, volume) {
+    if (!audio) return false;
+
+    try {
+        // Clone audio for concurrent playback support
+        const clone = audio.cloneNode();
+        clone.volume = Math.min(1, Math.max(0, volume));
+        // Silently catch autoplay policy errors - browser may block until user interaction
+        clone.play().catch(() => { });
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
+ * Get random element from array
+ */
+function getRandomElement(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
 
 /**
  * Get the settings for this extension.
@@ -247,11 +378,67 @@ function getCharacterAvatar() {
 }
 
 /**
- * Play typing sound effect using Web Audio API
+ * Play typing sound effect - prefers audio files over synthesized sounds
+ * @param {number} volume Volume level (0-1)
+ * @param {string} theme Sound theme
+ * @param {boolean} isUser Whether this is for user typing (uses different custom sound)
+ * @param {string|null} key The key that was pressed (for key-specific sounds)
+ */
+function playTypingSound(volume, theme = 'ios', isUser = false, key = null) {
+    const settings = getSettings();
+
+    // Detect special keys
+    const isDelete = key === 'Backspace' || key === 'Delete';
+    const isEnter = key === 'Enter';
+
+    // Priority 1: Custom deletion sound (if deleting)
+    if (isDelete && audioCache.deleteCustom) {
+        if (playAudioFile(audioCache.deleteCustom, volume)) {
+            return;
+        }
+    }
+
+    // Priority 2: Theme-specific key sounds
+    if (theme === 'osu') {
+        if (isDelete && audioCache.osuDelete && playAudioFile(audioCache.osuDelete, volume)) return;
+        if (isEnter && audioCache.osuEnter && playAudioFile(audioCache.osuEnter, volume)) return;
+    } else if (theme === 'ios') {
+        if (isDelete && audioCache.iosDelete && playAudioFile(audioCache.iosDelete, volume)) return;
+    }
+
+    // Priority 3: Custom uploaded sound
+    const customSound = isUser ? audioCache.userCustom : audioCache.custom;
+    if (customSound) {
+        if (playAudioFile(customSound, volume)) {
+            return; // Successfully played custom sound
+        }
+    }
+
+    // Priority 4: Bundled audio files (with random variation for osu/ios)
+    if (theme === 'osu' && audioCache.osu.length > 0) {
+        const sound = getRandomElement(audioCache.osu);
+        if (playAudioFile(sound, volume)) {
+            return; // Successfully played bundled Osu sound
+        }
+    } else if (theme === 'ios' && audioCache.ios.length > 0) {
+        const sound = getRandomElement(audioCache.ios);
+        if (playAudioFile(sound, volume)) {
+            return; // Successfully played bundled iOS sound
+        }
+    }
+
+    // Priority 5: Fall back to synthesized sounds (Web Audio API) - if enabled
+    if (settings.fallbackToSynthesized !== false) {
+        playSynthesizedSound(volume, theme);
+    }
+}
+
+/**
+ * Play synthesized sound using Web Audio API (fallback)
  * @param {number} volume Volume level (0-1)
  * @param {string} theme Sound theme
  */
-function playTypingSound(volume, theme = 'ios') {
+function playSynthesizedSound(volume, theme) {
     try {
         const ctx = initAudioContext();
         if (!ctx) return;
@@ -1329,6 +1516,38 @@ function addExtensionSettings(settings) {
         ], settings.soundTheme, v => settings.soundTheme = v)
     );
 
+    // Custom Sound File Upload for Character
+    const customSoundRow = document.createElement('div');
+    customSoundRow.classList.add('typing-setting-row');
+    const customSoundLabel = document.createElement('label');
+    customSoundLabel.textContent = t`Custom Character Sound`;
+    const customSoundInput = document.createElement('input');
+    customSoundInput.type = 'file';
+    customSoundInput.accept = 'audio/*';
+    customSoundInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                settings.customSoundFile = event.target.result;
+                audioCache.custom = loadCustomSound(settings.customSoundFile);
+                saveSettingsDebounced();
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    const customSoundClear = document.createElement('button');
+    customSoundClear.textContent = 'Clear';
+    customSoundClear.classList.add('menu_button');
+    customSoundClear.addEventListener('click', () => {
+        settings.customSoundFile = null;
+        audioCache.custom = null;
+        customSoundInput.value = '';
+        saveSettingsDebounced();
+    });
+    customSoundRow.append(customSoundLabel, customSoundInput, customSoundClear);
+    soundDrawer.content.append(customSoundRow);
+
     soundDrawer.content.append(
         createCheckbox(t`Simulate Typing Pauses`, settings.simulatePauses, v => settings.simulatePauses = v)
     );
@@ -1339,6 +1558,10 @@ function addExtensionSettings(settings) {
 
     soundDrawer.content.append(
         createCheckbox(t`Sound on Stream Start`, settings.soundOnStreamStart, v => settings.soundOnStreamStart = v)
+    );
+
+    soundDrawer.content.append(
+        createCheckbox(t`Fallback to Synthesized Sounds`, settings.fallbackToSynthesized, v => settings.fallbackToSynthesized = v)
     );
 
     soundDrawer.content.append(
@@ -1395,9 +1618,20 @@ function getUserAvatar() {
  * Show user typing indicator
  */
 let userTypingTimeout = null;
-function showUserTypingIndicator() {
+function showUserTypingIndicator(event) {
     const settings = getSettings();
     if (!settings.enabled || !settings.userTypingEnabled) return;
+
+    // Skip rendering indicator if it's a non-typing key
+    if (event) {
+        const key = event.key;
+        const nonTypingKeys = ['Shift', 'Control', 'Alt', 'Meta', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+            'Home', 'End', 'PageUp', 'PageDown', 'CapsLock', 'NumLock', 'ScrollLock',
+            'Escape', 'Tab', 'Insert', 'PrintScreen'];
+        if (nonTypingKeys.includes(key) || (key.startsWith('F') && key.length <= 3)) {
+            return;
+        }
+    }
 
     // Clear existing timeout
     if (userTypingTimeout) {
@@ -1407,7 +1641,7 @@ function showUserTypingIndicator() {
 
     // Play sound on each keystroke if enabled
     if (settings.userSoundEnabled) {
-        playTypingSound(settings.soundVolume * (0.7 + Math.random() * 0.3), settings.userSoundTheme || 'ios');
+        playTypingSound(settings.soundVolume * (0.7 + Math.random() * 0.3), settings.userSoundTheme || 'ios', true, event ? event.key : null);
     }
 
     let indicator = document.getElementById('typing_indicator_user');
@@ -1459,6 +1693,9 @@ function hideUserTypingIndicator() {
     const settings = getSettings();
     addExtensionSettings(settings);
 
+    // Initialize audio files (bundled + custom sounds)
+    initAudioFiles();
+
     const showEvents = [event_types.GENERATION_AFTER_COMMANDS];
     const hideEvents = [event_types.GENERATION_STOPPED, event_types.GENERATION_ENDED, event_types.CHAT_CHANGED];
     const chunkEvents = [event_types.CHARACTER_MESSAGE_RENDERED];
@@ -1478,10 +1715,10 @@ function hideUserTypingIndicator() {
     // Hide user typing indicator when message is sent
     eventSource.on(event_types.MESSAGE_SENT, hideUserTypingIndicator);
 
-    // User typing indicator - listen to input events
+    // User typing indicator - listen to keydown events (for backspace detection)
     const textarea = document.getElementById('send_textarea');
     if (textarea) {
-        textarea.addEventListener('input', showUserTypingIndicator);
+        textarea.addEventListener('keydown', showUserTypingIndicator);
     }
 
     // Apply mobile mode on load
